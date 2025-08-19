@@ -8,30 +8,29 @@ datasource db {
 }
 
 model User {
-  id             Int            @id @default(autoincrement())
+  id             String         @id @default(uuid())
   name           String
   email          String         @unique
   password       String
+  role           String         @default("USER")
   createdAt      DateTime       @default(now())
-  watchHistories WatchHistory[] // ← back-relation
+  watchHistories WatchHistory[]
 }
 
 model Movie {
-  id          Int      @id @default(autoincrement())
-  title       String
-  description String
-  genre       String
-  year        Int
-  url         String   // link to cloud-hosted video
-  createdAt   DateTime @default(now())
-
-
-  watchHistories WatchHistory[] // ← back-relation added here
+  id             Int            @id @default(autoincrement())
+  title          String
+  description    String
+  genre          String
+  year           Int
+  url            String
+  createdAt      DateTime       @default(now())
+  watchHistories WatchHistory[]
 }
 
 model WatchHistory {
   id        Int      @id @default(autoincrement())
-  userId    Int
+  userId    String
   movieId   Int
   watchedAt DateTime @default(now())
 
