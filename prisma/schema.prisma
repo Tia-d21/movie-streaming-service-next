@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String         @id @default(uuid())
+  name           String
+  email          String         @unique
+  password       String
+  role           String         @default("USER")
+  createdAt      DateTime       @default(now())
+  watchHistories WatchHistory[]
+}
+
+model Movie {
+  id             Int            @id @default(autoincrement())
+  title          String
+  description    String
+  genre          String         // Keep for backward compatibility
+  categoryId     String?        // New field for relation
+  year           Int
+  url            String
+  rating         Float?         // New field
+  createdAt      DateTime       @default(now())
+  category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  watchHistories WatchHistory[]
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  movies    Movie[]
+  
+  
+}
+
+model WatchHistory {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  movieId   Int
+  watchedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+}
