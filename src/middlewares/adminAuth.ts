@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
@@ -26,25 +25,4 @@ export async function adminAuth(req: NextRequest) {
   } catch (err) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-=======
-import { NextRequest } from 'next/server';
-import { authMiddleware } from './auth';
-
-export async function adminAuth(req: NextRequest) {
-  const user = await authMiddleware(req);
-
-  if (!user) {
-    const error: any = new Error('Unauthorized: No valid token');
-    error.status = 401;
-    throw error;
-  }
-
-  if (user.role !== 'ADMIN') {
-    const error: any = new Error('Unauthorized: Admin only');
-    error.status = 401;
-    throw error;
-  }
-
-  return user;
->>>>>>> backend/users-categories-watchhistory
 }
