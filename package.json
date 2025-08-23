@@ -13,6 +13,10 @@
     "bcryptjs": "^3.0.2",
     "jsonwebtoken": "^9.0.2",
     "next": "15.4.7",
+<<<<<<< HEAD
+=======
+    "node": "^24.6.0",
+>>>>>>> backend/users-categories-watchhistory
     "pg": "^8.16.3",
     "react": "19.1.0",
     "react-dom": "19.1.0"
