@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authMiddleware } from '@/middlewares/auth';
+import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { adminAuth } from '@/middlewares/adminAuth';
+import { authMiddleware } from '@/middlewares/auth';
 
-export async function GET(request: NextRequest) {
+// GET all users (admin only)
+export async function GET(req: NextRequest) {
   try {
-    const user = await authMiddleware(request);
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    await adminAuth(req);
 
-    const userData = await prisma.user.findUnique({
-      where: { id: user.userId },
+    const users = await prisma.user.findMany({
       select: {
         id: true,
         name: true,
@@ -22,21 +17,47 @@ export async function GET(request: NextRequest) {
         role: true,
         createdAt: true,
       },
+      orderBy: { createdAt: 'desc' },
     });
 
-    if (!userData) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+    return NextResponse.json(users);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Unauthorized' }, { status: 401 });
+  }
+}
+
+// POST create user (signup – open to all)
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { name, email, password, role } = body;
+
+    if (!name || !email || !password) {
+      return NextResponse.json({ error: 'Name, email, and password are required' }, { status: 400 });
     }
 
-    return NextResponse.json(userData);
-  } catch (error) {
-    console.error('Error fetching user:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const validRoles = ['USER', 'ADMIN'];
+    const userRole = validRoles.includes(role) ? role : 'USER';
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role: userRole,
+      },
+    });
+
+    return NextResponse.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    }, { status: 201 });
+  } catch (error: any) {
+    console.error('Error creating user:', error);
+    if (error.code === 'P2002') return NextResponse.json({ error: 'Email already exists' }, { status: 409 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
