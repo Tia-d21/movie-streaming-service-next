@@ -12,16 +12,16 @@ export async function adminAuth(req: NextRequest) {
     const token = authHeader.replace('Bearer ', '');
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Verify token
+    
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; role: string };
     if (!decoded || decoded.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Optionally attach userId to request if needed
+    
     (req as any).userId = decoded.userId;
 
-    return true; // admin verified
+    return true; 
   } catch (err) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

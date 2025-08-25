@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { adminAuth } from '@/middlewares/adminAuth';
 import { authMiddleware } from '@/middlewares/auth';
 
-// GET all users (admin only)
+
 export async function GET(req: NextRequest) {
   try {
     await adminAuth(req);
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST create user (signup – open to all)
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();

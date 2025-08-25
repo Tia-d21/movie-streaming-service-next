@@ -10,7 +10,6 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Admin can get any user, normal user can get only self
     if (user.role !== 'ADMIN' && user.userId !== params.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -38,7 +37,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Admin can update any user, normal user can update only self
     if (user.role !== 'ADMIN' && user.userId !== params.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -51,7 +49,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (email) dataToUpdate.email = email;
     if (password) dataToUpdate.password = await bcrypt.hash(password, 10);
 
-    // Only admin can update role
+
     if (role && user.role === 'ADMIN') dataToUpdate.role = role;
 
     const updatedUser = await prisma.user.update({
