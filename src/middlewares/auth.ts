@@ -17,7 +17,7 @@ export async function authMiddleware(req: NextRequest): Promise<AuthUser | null>
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
 
-    // Ensure user exists in DB
+   
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
     });
@@ -26,7 +26,7 @@ export async function authMiddleware(req: NextRequest): Promise<AuthUser | null>
 
     return { userId: user.id, role: user.role };
   } catch (err: any) {
-    console.error('Auth error:', err); // <-- log JWT/DB errors
+    console.error('Auth error:', err); 
     return null;
   }
 }

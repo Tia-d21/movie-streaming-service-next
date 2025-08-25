@@ -10,7 +10,6 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Admin can get any user, normal user can get only self
     if (user.role !== 'ADMIN' && user.userId !== params.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -38,7 +37,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Admin can update any user, normal user can update only self
     if (user.role !== 'ADMIN' && user.userId !== params.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -46,12 +44,26 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const body = await req.json();
     const { name, email, password, role } = body;
 
+    const emailRegex =  /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+
+    if (email && !emailRegex.test(email)) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
+    }
+
+    if (password && !passwordRegex.test(password)) {
+      return NextResponse.json({
+        error:
+          'Password must be 8-20 characters long, include uppercase, lowercase, number, and special character',
+      }, { status: 400 });
+    }
+
     const dataToUpdate: any = {};
     if (name) dataToUpdate.name = name;
     if (email) dataToUpdate.email = email;
     if (password) dataToUpdate.password = await bcrypt.hash(password, 10);
 
-    // Only admin can update role
+
     if (role && user.role === 'ADMIN') dataToUpdate.role = role;
 
     const updatedUser = await prisma.user.update({

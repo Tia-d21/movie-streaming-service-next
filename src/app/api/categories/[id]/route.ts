@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/middlewares/adminAuth';
 import { prisma } from '@/lib/prisma';
 
-// GET category by id
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const category = await prisma.category.findUnique({
-      where: { id: params.id }, // string ID now
+      where: { id: params.id }, 
       include: {
         movies: {
           select: { id: true, title: true, description: true, rating: true, createdAt: true },
@@ -28,7 +28,7 @@ export async function GET(
   }
 }
 
-// PUT update category (admin only)
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -53,7 +53,6 @@ export async function PUT(
   }
 }
 
-// DELETE category (admin only)
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -61,7 +60,7 @@ export async function DELETE(
   try {
     await adminAuth(req);
 
-    // check if category has movies
+    
     const count = await prisma.movie.count({ where: { categoryId: params.id } });
     if (count > 0) return NextResponse.json({ error: 'Cannot delete category with movies' }, { status: 400 });
 
