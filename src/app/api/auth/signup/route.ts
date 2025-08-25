@@ -50,7 +50,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id: user.id, email: user.email }, { status: 201 });
   } catch (error) {
-    console.error('Signup Error:', error);
-    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
+    return NextResponse.json({ error: 'the user already exists' }, { status: 500 });
   }
 }
