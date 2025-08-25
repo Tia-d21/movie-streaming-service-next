@@ -44,6 +44,20 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const body = await req.json();
     const { name, email, password, role } = body;
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/;
+
+    if (email && !emailRegex.test(email)) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
+    }
+
+    if (password && !passwordRegex.test(password)) {
+      return NextResponse.json({
+        error:
+          'Password must be 8-20 characters long, include uppercase, lowercase, number, and special character',
+      }, { status: 400 });
+    }
+    
     const dataToUpdate: any = {};
     if (name) dataToUpdate.name = name;
     if (email) dataToUpdate.email = email;
