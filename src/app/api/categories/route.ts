@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/middlewares/adminAuth';
 import { prisma } from '@/lib/prisma';
 
-
 export async function GET(req: NextRequest) {
   try {
     const categories = await prisma.category.findMany({
@@ -17,10 +16,10 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ✅ POST create new category (admin only)
+
 export async function POST(req: NextRequest) {
   try {
-    // 🔒 Ensure user is admin
+    
     await adminAuth(req);
 
     const body = await req.json();
@@ -36,7 +35,6 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Error creating category:', error);
 
-    // 🔑 Handle Unauthorized
     if (error.message?.includes('Unauthorized')) {
       return NextResponse.json({ error: error.message }, { status: 401 });
     }

@@ -5,43 +5,50 @@ import { prisma } from '@/lib/prisma';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const { name, email, password, role } = body;
+    
+    if (!name || !email || !password) {
+      return NextResponse.json(
+        { error: 'Name, email, and password are required' },
+        { status: 400 }
+      );
+    }
 
-<<<<<<< HEAD
-=======
-  
-    const validRoles = ['USER', 'ADMIN'];
-    const role = validRoles.includes(body.role) ? body.role : 'USER';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
+    }
 
->>>>>>> backend/users-categories-watchhistory
-    const hashedPassword = await bcrypt.hash(body.password, 10);
+    const passwordRegex =
+     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return NextResponse.json(
+        {
+          error:
+            'Password must be at least 8 characters, include uppercase, lowercase, number, and special character',
+        },
+        { status: 400 }
+      );
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return NextResponse.json({ error: 'Email already in use' }, { status: 409 });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
       data: {
-        name: body.name,
-        email: body.email,
+        name,
+        email,
         password: hashedPassword,
-<<<<<<< HEAD
-        role: body.role || 'USER',
+        role: role || 'USER',
       },
     }) as { id: string; email: string };
 
-    return NextResponse.json(
-      { id: user.id, email: user.email },
-=======
-        role: role,
-      },
-    });
-
-    return NextResponse.json(
-      { id: user.id, email: user.email, name: user.name, role: user.role },
->>>>>>> backend/users-categories-watchhistory
-      { status: 201 }
-    );
+    return NextResponse.json({ id: user.id, email: user.email }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: 'the user already exists' }, { status: 500 });
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> backend/users-categories-watchhistory
