@@ -1,28 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+import { NextRequest } from 'next/server';
+import { authMiddleware } from './auth';
 
 export async function adminAuth(req: NextRequest) {
-  try {
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = await authMiddleware(req);
 
-    const token = authHeader.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; role: string };
-    if (!decoded || decoded.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    
-    (req as any).userId = decoded.userId;
-
-    return true; 
-  } catch (err) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) {
+    const error: any = new Error('Unauthorized: No valid token');
+    error.status = 401;
+    throw error;
   }
+
+  if (user.role !== 'ADMIN') {
+    const error: any = new Error('Unauthorized: Admin only');
+    error.status = 401;
+    throw error;
+  }
+
+  return user;
 }
+
