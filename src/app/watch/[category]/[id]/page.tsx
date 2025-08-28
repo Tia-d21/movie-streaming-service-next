@@ -5,9 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import Image from "next/image";
-import VideoPlayer from "../../../../app/components/ui/VideoPlayer"; // Updated import
-import { fetchMediaDetails } from "../../../../app/services/tmdb"; // Updated import
-import { MediaItem } from "../../../../app/data/mockData"; // Updated import
+import VideoPlayer from "../../../../app/components/ui/VideoPlayer"; 
+import { fetchMediaDetails } from "../../../../app/services/tmdb"; 
+import { MediaItem } from "../../../../app/data/mockData"; 
 
 export default function WatchPage() {
   const params = useParams();
