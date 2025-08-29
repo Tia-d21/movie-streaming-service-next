@@ -80,3 +80,36 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest, context: { params: { id: string } }) {
+  try {
+    const params = await context.params;
+    const id = params.id;
+
+    const user = await authMiddleware(req);
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    
+    if (user.role !== 'ADMIN' && user.userId !== id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    await prisma.rating.deleteMany({ where: { userId: id } });
+    await prisma.favorite.deleteMany({ where: { userId: id } });
+    await prisma.myList.deleteMany({ where: { userId: id } });
+    await prisma.feedback.deleteMany({ where: { userId: id } });
+
+    const deletedUser = await prisma.user.delete({
+      where: { id },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    });
+
+    return NextResponse.json({ message: 'User deleted successfully', user: deletedUser });
+  } catch (error: any) {
+    console.error('Error deleting user:', error);
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
