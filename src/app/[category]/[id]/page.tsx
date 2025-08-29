@@ -4,7 +4,15 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Play, Plus, X, ChevronLeft, ThumbsUp } from "lucide-react";
+import {
+  Play,
+  Plus,
+  X,
+  ChevronLeft,
+  ThumbsUp,
+  Star,
+  Trash2,
+} from "lucide-react";
 import Navbar from "../../../app/components/layout/Navbar";
 import Footer from "../../../app/components/layout/Footer";
 import MovieCard from "../../../app/components/ui/MovieCard";
@@ -15,11 +23,24 @@ import { useFavorites } from "../../../app/hooks/useFavorites";
 import { useUserProfile } from "../../../app/hooks/useUserProfile";
 import { useAuthModal } from "../../../app/hooks/useAuthModal";
 
+interface Comment {
+  id: number;
+  user: string;
+  userEmail: string; // Using email as the temporary unique identifier
+  text: string;
+  timestamp: string;
+}
+
 export default function MovieDetails() {
   const params = useParams();
   const router = useRouter();
   const [item, setItem] = useState<MediaItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [showRatingWidget, setShowRatingWidget] = useState(false);
+  const [currentUserRating, setCurrentUserRating] = useState(0);
+  const [currentComment, setCurrentComment] = useState("");
+  const [comments, setComments] = useState<Comment[]>([]);
 
   const { user } = useUserProfile();
   const { openModal } = useAuthModal();
@@ -55,11 +76,7 @@ export default function MovieDetails() {
       openModal();
       return;
     }
-    if (isInMyList(item.id)) {
-      removeFromMyList(item.id);
-    } else {
-      addToMyList(item);
-    }
+    isInMyList(item.id) ? removeFromMyList(item.id) : addToMyList(item);
   };
 
   const handleToggleFavorite = () => {
@@ -68,6 +85,42 @@ export default function MovieDetails() {
       return;
     }
     toggleFavorite(item);
+  };
+
+  const handleRatingSubmit = (rating: number) => {
+    if (!user) {
+      openModal();
+      return;
+    }
+    setCurrentUserRating(rating);
+    setShowRatingWidget(false);
+  };
+
+  const handleCommentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      openModal();
+      return;
+    }
+    if (currentComment.trim()) {
+      const newComment: Comment = {
+        id: Date.now(),
+        user: user.name || "Logged-in User",
+        userEmail: user.email,
+        text: currentComment,
+        timestamp: new Date().toISOString(),
+      };
+      setComments([newComment, ...comments]);
+      setCurrentComment("");
+    }
+  };
+
+  const handleDeleteComment = (commentIdToDelete: number) => {
+    if (window.confirm("Are you sure you want to delete this comment?")) {
+      setComments((prevComments) =>
+        prevComments.filter((comment) => comment.id !== commentIdToDelete)
+      );
+    }
   };
 
   if (isLoading) {
@@ -98,8 +151,7 @@ export default function MovieDetails() {
             onClick={handleGoBack}
             className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md transition-colors"
           >
-            <ChevronLeft size={20} />
-            Go Back
+            <ChevronLeft size={20} /> Go Back
           </button>
         </div>
       </div>
@@ -113,6 +165,7 @@ export default function MovieDetails() {
     <div className="min-h-screen bg-black text-white">
       <Navbar />
 
+      {/* --- TOP HERO SECTION --- */}
       <div className="relative w-full h-[80vh] overflow-hidden">
         <div className="absolute inset-0">
           <Image
@@ -136,24 +189,30 @@ export default function MovieDetails() {
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4">
               {item.title}
             </h1>
-            <div className="flex items-center text-sm text-gray-300 mb-4">
-              <span className="bg-red-600 text-white px-2 py-0.5 rounded mr-3">
-                {item.rating}
-              </span>
+
+            <div className="flex items-center text-sm text-gray-300 mb-4 flex-wrap">
+              <div className="flex items-center mr-4 bg-black/50 p-1 rounded-md">
+                <Star size={16} className="text-yellow-400 mr-1.5" />
+                <span className="font-bold text-base text-white">
+                  {item.rating} ★
+                </span>
+              </div>
               <span>{item.releaseYear}</span>
               {item.duration && (
                 <>
-                  <span className="mx-2">•</span>
-                  <span>{item.duration}</span>
+                  {" "}
+                  <span className="mx-2">•</span> <span>{item.duration}</span>{" "}
                 </>
               )}
               {item.seasons && (
                 <>
-                  <span className="mx-2">•</span>
-                  <span>{item.seasons} Seasons</span>
+                  {" "}
+                  <span className="mx-2">•</span>{" "}
+                  <span>{item.seasons} Seasons</span>{" "}
                 </>
               )}
             </div>
+
             <p className="text-gray-300 mb-8 line-clamp-3 md:line-clamp-4">
               {item.overview}
             </p>
@@ -165,8 +224,7 @@ export default function MovieDetails() {
                 onClick={handlePlay}
                 className="flex items-center bg-white text-black px-6 py-2 rounded font-medium cursor-pointer"
               >
-                <Play className="mr-2" size={20} />
-                Play
+                <Play className="mr-2" size={20} /> Play
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -199,11 +257,51 @@ export default function MovieDetails() {
                 {isItemFavorite ? "Favorited" : "Favorite"}
               </motion.button>
             </div>
+
+            <div className="mt-6">
+              <button
+                onClick={() =>
+                  user ? setShowRatingWidget(!showRatingWidget) : openModal()
+                }
+                className="text-white hover:text-yellow-400 transition-colors text-l font-semibold cursor-pointer"
+              >
+                {currentUserRating > 0
+                  ? `You rated this ${currentUserRating} ★`
+                  : "Rate this movie"}
+              </button>
+              {showRatingWidget && user && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center space-x-1 mt-2 bg-black/50 p-2 rounded-md w-fit"
+                >
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <motion.div
+                      key={star}
+                      whileHover={{ scale: 1.2 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <Star
+                        size={28}
+                        className={`cursor-pointer transition-colors ${
+                          star <= currentUserRating
+                            ? "text-yellow-400 fill-yellow-400"
+                            : "text-gray-500"
+                        }`}
+                        onClick={() => handleRatingSubmit(star)}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </div>
           </motion.div>
         </div>
       </div>
 
+      {/* --- MAIN CONTENT AREA --- */}
       <div className="container mx-auto px-4 md:px-8 py-12">
+        {/* --- CAST & CREW SECTION (RESTORED) --- */}
         {item.cast && item.cast.length > 0 && (
           <>
             <h2 className="text-2xl font-bold mb-6">Cast & Crew</h2>
@@ -236,6 +334,7 @@ export default function MovieDetails() {
           </>
         )}
 
+        {/* --- MORE LIKE THIS SECTION (RESTORED) --- */}
         {item.similar && item.similar.length > 0 && (
           <div className="mt-16">
             <h2 className="text-2xl font-bold mb-6">More Like This</h2>
@@ -244,7 +343,6 @@ export default function MovieDetails() {
                 <MovieCard
                   key={similarItem.id}
                   {...similarItem}
-                  // These props are missing from 'similar' type, provide defaults
                   overview=""
                   backdropPath=""
                   releaseYear=""
@@ -257,6 +355,74 @@ export default function MovieDetails() {
             </div>
           </div>
         )}
+
+        {/* --- COMMENT SECTION --- */}
+        <div className="mt-16">
+          <h2 className="text-2xl font-bold mb-6">Comments on {item.title}</h2>
+          <div className="mb-8 max-w-2xl">
+            <form onSubmit={handleCommentSubmit}>
+              <textarea
+                value={currentComment}
+                onChange={(e) => setCurrentComment(e.target.value)}
+                placeholder={
+                  user
+                    ? `Commenting as ${user.name}...`
+                    : "Please log in to add a comment"
+                }
+                className="w-full bg-gray-800 text-white p-3 rounded-md focus:ring-2 focus:ring-red-600 outline-none transition disabled:bg-gray-900"
+                rows={3}
+                disabled={!user}
+              />
+              <div className="text-right">
+                <button
+                  type="submit"
+                  className="cursor-pointer mt-2 bg-red-600 hover:bg-red-700 text-white py-2 px-6 rounded-md font-semibold transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!user || !currentComment.trim()}
+                >
+                  Post Comment
+                </button>
+              </div>
+            </form>
+          </div>
+          <div className="space-y-4 max-w-2xl">
+            {comments.length > 0 ? (
+              comments.map((comment) => (
+                <motion.div
+                  key={comment.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.4 }}
+                  className="bg-gray-900/50 p-4 rounded-lg border border-gray-800"
+                >
+                  <div className="flex items-center mb-2">
+                    <p className="font-bold text-white">{comment.user}</p>
+                    <p className="text-gray-400 text-xs ml-auto">
+                      {new Date(comment.timestamp).toLocaleString()}
+                    </p>
+                    {user && user.email === comment.userEmail && (
+                      <button
+                        onClick={() => handleDeleteComment(comment.id)}
+                        className="ml-4 text-gray-400 hover:text-red-500 transition-colors"
+                        aria-label="Delete comment"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-gray-300 whitespace-pre-wrap">
+                    {comment.text}
+                  </p>
+                </motion.div>
+              ))
+            ) : (
+              <div className="text-center py-8 bg-gray-900/50 rounded-lg max-w-2xl">
+                <p className="text-gray-500">
+                  No comments yet. Be the first to share your thoughts!
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <Footer />

@@ -21,15 +21,6 @@ model Movie {
   id             Int            @id @default(autoincrement())
   title          String
   description    String
-<<<<<<< HEAD
-  genre          String
-  year           Int
-  url            String
-  createdAt      DateTime       @default(now())
-  watchHistories WatchHistory[]
-}
-
-=======
   genre          String         // Keep for backward compatibility
   categoryId     String?        // New field for relation
   year           Int
@@ -48,19 +39,12 @@ model Category {
   
 }
 
->>>>>>> backend/users-categories-watchhistory
 model WatchHistory {
   id        Int      @id @default(autoincrement())
   userId    String
   movieId   Int
   watchedAt DateTime @default(now())
 
-<<<<<<< HEAD
-  user  User  @relation(fields: [userId], references: [id])
-  movie Movie @relation(fields: [movieId], references: [id])
-}
-=======
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
 }
->>>>>>> backend/users-categories-watchhistory
