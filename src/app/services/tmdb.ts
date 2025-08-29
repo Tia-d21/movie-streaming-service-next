@@ -4,22 +4,21 @@ const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const BASE_URL = "https://api.themoviedb.org/3";
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/";
 
+// --- INTERFACES ---
 interface TMDBVideo {
   site: string;
   type: string;
   key: string;
 }
-
 interface TMDBCast {
   name: string;
   character: string;
   profile_path: string | null;
 }
-
 interface TMDBGenre {
+  id: number;
   name: string;
 }
-
 interface TMDBRecommendation {
   id: number;
   title?: string;
@@ -27,7 +26,6 @@ interface TMDBRecommendation {
   poster_path?: string | null;
   media_type?: string;
 }
-
 interface TMDBItem {
   id: number | string;
   title?: string;
@@ -42,35 +40,27 @@ interface TMDBItem {
   number_of_seasons?: number;
   media_type?: string;
   genres?: TMDBGenre[];
+  genre_ids?: number[];
   credits?: { cast: TMDBCast[] };
   recommendations?: { results: TMDBRecommendation[] };
   videos?: { results: TMDBVideo[] };
 }
-
 interface TMDBResults {
   results: TMDBItem[];
-  [key: string]: unknown;
+  page: number;
+  total_pages: number;
+}
+export interface PaginatedResponse {
+  results: MediaItem[];
+  page: number;
+  totalPages: number;
 }
 
+// --- CORE FUNCTIONS ---
 const formatMediaItem = (item: TMDBItem): MediaItem => {
-  let officialTrailer = null;
-  if (item.videos?.results) {
-    officialTrailer = item.videos.results.find(
-      (video: TMDBVideo) => video.site === "YouTube" && video.type === "Trailer"
-    );
-    if (!officialTrailer) {
-      officialTrailer = item.videos.results.find(
-        (video: TMDBVideo) =>
-          video.site === "YouTube" && video.type === "Teaser"
-      );
-    }
-    if (!officialTrailer) {
-      officialTrailer = item.videos.results.find(
-        (video: TMDBVideo) => video.site === "YouTube"
-      );
-    }
-  }
-
+  const genreIds = item.genres
+    ? item.genres.map((g) => g.id)
+    : item.genre_ids || [];
   return {
     id: item.id.toString(),
     title: item.title || item.name || "Untitled",
@@ -89,15 +79,17 @@ const formatMediaItem = (item: TMDBItem): MediaItem => {
       : undefined,
     seasons: item.number_of_seasons,
     category: item.media_type === "movie" || item.title ? "movie" : "tv",
-    genres: item.genres?.map((g: TMDBGenre) => g.name) || [],
+    genres: genreIds,
     cast:
-      item.credits?.cast.slice(0, 6).map((c: TMDBCast) => ({
-        name: c.name,
-        character: c.character,
-        profilePath: c.profile_path
-          ? `${IMAGE_BASE_URL}w185${c.profile_path}`
-          : "/poster-placeholder.svg",
-      })) || [],
+      item.credits?.cast
+        .slice(0, 6)
+        .map((c: TMDBCast) => ({
+          name: c.name,
+          character: c.character,
+          profilePath: c.profile_path
+            ? `${IMAGE_BASE_URL}w185${c.profile_path}`
+            : "/poster-placeholder.svg",
+        })) || [],
     similar:
       item.recommendations?.results.map((r: TMDBRecommendation) => ({
         id: r.id.toString(),
@@ -107,7 +99,7 @@ const formatMediaItem = (item: TMDBItem): MediaItem => {
           : "/poster-placeholder.svg",
         category: r.media_type === "movie" || r.title ? "movie" : "tv",
       })) || [],
-    trailerKey: officialTrailer?.key,
+    trailerKey: item.videos?.results.find((v) => v.site === "YouTube")?.key,
   };
 };
 
@@ -119,15 +111,15 @@ const fetchFromTMDB = async (
     const url = `${BASE_URL}${endpoint}?api_key=${API_KEY}&${params}`;
     const response = await fetch(url);
     if (!response.ok) {
-      console.error(`Failed to fetch from endpoint: ${endpoint}`);
       return null;
     }
     return await response.json();
   } catch (error) {
-    console.error(error);
     return null;
   }
 };
+
+// --- EXPORTED API FUNCTIONS ---
 
 export const fetchMediaDetails = async (
   id: string,
@@ -137,27 +129,108 @@ export const fetchMediaDetails = async (
     `/${category}/${id}`,
     "append_to_response=credits,recommendations,videos"
   );
-  if (!details) return null;
-  return formatMediaItem(details as TMDBItem);
+  return details ? formatMediaItem(details as TMDBItem) : null;
 };
 
-export const fetchTrending = async (): Promise<MediaItem[]> => {
-  const data = await fetchFromTMDB("/trending/all/week");
-  return (data as TMDBResults)?.results?.map(formatMediaItem) ?? [];
+export const getGenreList = async (
+  type: "movie" | "tv"
+): Promise<{ id: number; name: string }[]> => {
+  const data = await fetchFromTMDB(`/genre/${type}/list`);
+  return (data as { genres: { id: number; name: string }[] })?.genres || [];
 };
 
-export const fetchPopularMovies = async (): Promise<MediaItem[]> => {
-  const data = await fetchFromTMDB("/movie/popular");
-  return (data as TMDBResults)?.results?.map(formatMediaItem) ?? [];
+// --- PAGINATED FUNCTIONS (For Browse Page Infinite Scroll) ---
+
+export const fetchTrendingByPage = async (
+  page: number
+): Promise<PaginatedResponse> => {
+  const data = (await fetchFromTMDB(
+    "/trending/all/week",
+    `page=${page}`
+  )) as TMDBResults;
+  return {
+    results: data?.results?.map(formatMediaItem) ?? [],
+    page: data?.page ?? 1,
+    totalPages: data?.total_pages ?? 1,
+  };
 };
 
-export const fetchTopRatedShows = async (): Promise<MediaItem[]> => {
-  const data = await fetchFromTMDB("/tv/top_rated");
-  return (data as TMDBResults)?.results?.map(formatMediaItem) ?? [];
+export const fetchPopularMoviesByPage = async (
+  page: number
+): Promise<PaginatedResponse> => {
+  const data = (await fetchFromTMDB(
+    "/movie/popular",
+    `page=${page}`
+  )) as TMDBResults;
+  return {
+    results: data?.results?.map(formatMediaItem) ?? [],
+    page: data?.page ?? 1,
+    totalPages: data?.total_pages ?? 1,
+  };
 };
 
-export const fetchUpcomingMovies = async (): Promise<MediaItem[]> => {
-  const data = await fetchFromTMDB("/movie/upcoming");
+export const fetchTopRatedShowsByPage = async (
+  page: number
+): Promise<PaginatedResponse> => {
+  const data = (await fetchFromTMDB(
+    "/tv/top_rated",
+    `page=${page}`
+  )) as TMDBResults;
+  return {
+    results: data?.results?.map(formatMediaItem) ?? [],
+    page: data?.page ?? 1,
+    totalPages: data?.total_pages ?? 1,
+  };
+};
+
+export const fetchUpcomingMoviesByPage = async (
+  page: number
+): Promise<PaginatedResponse> => {
+  const data = (await fetchFromTMDB(
+    "/movie/upcoming",
+    `page=${page}`
+  )) as TMDBResults;
+  return {
+    results: data?.results?.map(formatMediaItem) ?? [],
+    page: data?.page ?? 1,
+    totalPages: data?.total_pages ?? 1,
+  };
+};
+
+export const fetchMediaByGenreByPage = async (
+  type: "movie" | "tv",
+  genreId: number,
+  page: number
+): Promise<PaginatedResponse> => {
+  const data = (await fetchFromTMDB(
+    `/discover/${type}`,
+    `sort_by=popularity.desc&with_genres=${genreId}&page=${page}`
+  )) as TMDBResults;
+  return {
+    results: data?.results?.map(formatMediaItem) ?? [],
+    page: data?.page ?? 1,
+    totalPages: data?.total_pages ?? 1,
+  };
+};
+
+// --- NON-PAGINATED FUNCTIONS (For Search Page) ---
+
+export const discoverMedia = async (
+  type: "movie" | "tv",
+  year?: string,
+  genres?: number[]
+): Promise<MediaItem[]> => {
+  const endpoint = `/discover/${type}`;
+  let params = "sort_by=popularity.desc&page=1"; // Fetch only first page for initial discover
+  if (year) {
+    const yearParam =
+      type === "movie" ? "primary_release_year" : "first_air_date_year";
+    params += `&${yearParam}=${year}`;
+  }
+  if (genres && genres.length > 0) {
+    params += `&with_genres=${genres.join(",")}`;
+  }
+  const data = await fetchFromTMDB(endpoint, params);
   return (data as TMDBResults)?.results?.map(formatMediaItem) ?? [];
 };
 
@@ -165,23 +238,15 @@ export const searchMedia = async (
   query: string,
   filter: "all" | "movie" | "tv"
 ): Promise<MediaItem[]> => {
-  let endpoint = "";
-  switch (filter) {
-    case "movie":
-      endpoint = "/search/movie";
-      break;
-    case "tv":
-      endpoint = "/search/tv";
-      break;
-    case "all":
-    default:
-      endpoint = "/search/multi";
-      break;
-  }
-
+  const endpoint =
+    filter === "movie"
+      ? "/search/movie"
+      : filter === "tv"
+      ? "/search/tv"
+      : "/search/multi";
   const data = await fetchFromTMDB(
     endpoint,
-    `query=${encodeURIComponent(query)}`
+    `query=${encodeURIComponent(query)}&page=1`
   );
   const mediaResults =
     (data as TMDBResults)?.results?.filter(

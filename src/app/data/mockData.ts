@@ -11,8 +11,9 @@ export type MediaItem = {
   duration?: string;
   episodes?: number;
   seasons?: number;
+  media_type?: "movie" | "tv" | "person";
   category: "movie" | "tv";
-  genres: string[];
+  genres: number[];
   cast: {
     name: string;
     character: string;

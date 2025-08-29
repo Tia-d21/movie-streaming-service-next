@@ -1,124 +1,160 @@
-// movie-streaming-app\src\components\ui\Carousel.tsx
-
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { MediaItem } from "../../data/mockData";
 import MovieCard from "./MovieCard";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  fetchTrendingByPage,
+  fetchPopularMoviesByPage,
+  fetchTopRatedShowsByPage,
+  fetchUpcomingMoviesByPage,
+  fetchMediaByGenreByPage,
+  PaginatedResponse,
+} from "../../services/tmdb";
 
-// --- FIX 1: Import the correct MediaItem type ---
-import { MediaItem } from "../../../app/data/mockData";
+export type CategoryType =
+  | "trending"
+  | "popular-movies"
+  | "tv-shows"
+  | "new-releases"
+  | "genre";
 
-// We no longer need the local 'Movie' type definition, so it has been removed.
-
-// --- FIX 2: Update the props to use the MediaItem type ---
-type CarouselProps = {
+interface CarouselProps {
   title: string;
-  movies: MediaItem[];
-};
+  initialItems: MediaItem[];
+  categoryType: CategoryType;
+  genreId?: number;
+  mediaType?: "movie" | "tv";
+}
 
-export default function Carousel({ title, movies }: CarouselProps) {
-  const [showLeftArrow, setShowLeftArrow] = useState(false);
-  const [showRightArrow, setShowRightArrow] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const carouselRef = useRef<HTMLDivElement>(null);
+export default function Carousel({
+  title,
+  initialItems,
+  categoryType,
+  genreId,
+  mediaType = "movie",
+}: CarouselProps) {
+  const [items, setItems] = useState<MediaItem[]>(initialItems);
+  const [page, setPage] = useState(2);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Number of items to show based on screen size
-  const getItemsToShow = () => {
-    if (typeof window !== "undefined") {
-      if (window.innerWidth < 640) return 2; // Mobile
-      if (window.innerWidth < 1024) return 3; // Tablet
-      if (window.innerWidth < 1280) return 4; // Small desktop
-      return 5; // Large desktop
-    }
-    return 5; // Default
-  };
-
-  const [itemsToShow, setItemsToShow] = useState(5);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setItemsToShow(getItemsToShow());
+  // --- THIS IS THE FIX ---
+  // We move fetchMoreData inside useCallback and update the dependency array.
+  const loadMore = useCallback(async () => {
+    // Helper function is now defined inside the callback that uses it.
+    const fetchMoreData = async (
+      pageNum: number
+    ): Promise<PaginatedResponse | null> => {
+      switch (categoryType) {
+        case "trending":
+          return fetchTrendingByPage(pageNum);
+        case "popular-movies":
+          return fetchPopularMoviesByPage(pageNum);
+        case "tv-shows":
+          return fetchTopRatedShowsByPage(pageNum);
+        case "new-releases":
+          return fetchUpcomingMoviesByPage(pageNum);
+        case "genre":
+          if (genreId) {
+            return fetchMediaByGenreByPage(mediaType, genreId, pageNum);
+          }
+          return null;
+        default:
+          return null;
+      }
     };
 
-    // Set initial value
-    handleResize();
+    if (isLoadingMore || !hasMore) return;
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    setIsLoadingMore(true);
+    const response = await fetchMoreData(page);
 
-  const totalSlides = Math.ceil(movies.length / itemsToShow);
-
-  const handleNext = () => {
-    if (currentIndex < totalSlides - 1) {
-      setCurrentIndex(currentIndex + 1);
-      setShowLeftArrow(true);
-      if (currentIndex + 2 >= totalSlides) {
-        setShowRightArrow(false);
+    if (response && response.results.length > 0) {
+      setItems((prev) => {
+        const existingIds = new Set(
+          prev.map((p) => `${p.id}-${p.media_type || mediaType}`)
+        );
+        const newItems = response.results.filter(
+          (item) =>
+            !existingIds.has(`${item.id}-${item.media_type || mediaType}`)
+        );
+        return [...prev, ...newItems];
+      });
+      setPage((prev) => prev + 1);
+      if (response.page >= response.totalPages) {
+        setHasMore(false);
       }
+    } else {
+      setHasMore(false);
+    }
+    setIsLoadingMore(false);
+    // The dependency array is now more accurate, including everything
+    // from the "outside" that the callback depends on.
+  }, [isLoadingMore, hasMore, page, categoryType, genreId, mediaType]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollLeft, scrollWidth, clientWidth } = e.currentTarget;
+    if (scrollWidth - scrollLeft - clientWidth < 300) {
+      loadMore();
     }
   };
 
-  const handlePrev = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-      setShowRightArrow(true);
-      if (currentIndex - 1 <= 0) {
-        setShowLeftArrow(false);
-      }
+  const scroll = (direction: "left" | "right") => {
+    if (scrollRef.current) {
+      const { scrollLeft, clientWidth } = scrollRef.current;
+      const scrollTo =
+        direction === "left"
+          ? scrollLeft - clientWidth
+          : scrollLeft + clientWidth;
+      scrollRef.current.scrollTo({ left: scrollTo, behavior: "smooth" });
     }
   };
 
   return (
     <div className="mb-8">
-      <h2 className="text-xl font-medium text-white mb-4 px-4 md:px-8">
-        {title}
-      </h2>
-
+      <h2 className="text-2xl font-bold mb-4 text-white">{title}</h2>
       <div className="relative group">
-        {/* Left Navigation Arrow */}
-        {showLeftArrow && (
-          <button
-            onClick={handlePrev}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-black/50 p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-            aria-label="Previous"
-          >
-            <ChevronLeft size={24} />
-          </button>
-        )}
+        <button
+          onClick={() => scroll("left")}
+          className="absolute left-2 top-1/2 -translate-y-1-2 z-10 bg-black/60 hover:bg-black/90 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center w-9 h-9 rounded-full"
+        >
+          <ChevronLeft size={20} />
+        </button>
 
-        {/* Carousel Container */}
-        <div className="overflow-hidden px-4 md:px-8">
-          <motion.div
-            ref={carouselRef}
-            className="flex space-x-2 md:space-x-4"
-            animate={{ x: `-${currentIndex * 100}%` }}
-            transition={{ type: "tween", ease: "easeInOut", duration: 0.5 }}
-          >
-            {movies.map((movie) => (
-              <div
-                key={movie.id}
-                className="flex-none w-1/2 sm:w-1/3 md:w-1/4 lg:w-1/5"
-              >
-                {/* --- FIX 3: Use the spread operator --- */}
-                <MovieCard key={movie.id} {...movie} />
-              </div>
-            ))}
-          </motion.div>
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex overflow-x-scroll space-x-4 p-4 -m-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        >
+          {items.map((item) => (
+            <div
+              key={`${item.id}-${item.media_type || mediaType}`}
+              className="min-w-[180px] sm:min-w-[200px] md:min-w-[240px] lg:min-w-[280px]"
+            >
+              <MovieCard {...item} />
+            </div>
+          ))}
+          {isLoadingMore && (
+            <div className="flex items-center justify-center min-w-[100px] flex-shrink-0">
+              <motion.div
+                className="w-8 h-8 border-t-2 border-red-600 rounded-full"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              />
+            </div>
+          )}
         </div>
 
-        {/* Right Navigation Arrow */}
-        {showRightArrow && (
-          <button
-            onClick={handleNext}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-black/50 p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-            aria-label="Next"
-          >
-            <ChevronRight size={24} />
-          </button>
-        )}
+        <button
+          onClick={() => scroll("right")}
+          className="absolute right-2 top-1/2 -translate-y-1-2 z-10 bg-black/60 hover:bg-black/90 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center w-9 h-9 rounded-full"
+        >
+          <ChevronRight size={20} />
+        </button>
       </div>
     </div>
   );

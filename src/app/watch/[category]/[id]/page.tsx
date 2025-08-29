@@ -5,9 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import Image from "next/image";
-import VideoPlayer from "../../../../app/components/ui/VideoPlayer"; 
-import { fetchMediaDetails } from "../../../../app/services/tmdb"; 
-import { MediaItem } from "../../../../app/data/mockData"; 
+import VideoPlayer from "../../../../app/components/ui/VideoPlayer";
+import { fetchMediaDetails } from "../../../../app/services/tmdb";
+import { MediaItem } from "../../../../app/data/mockData";
+import { useWatchHistory } from "../../../../app/hooks/useWatchHistory"; // 1. Import the hook
 
 export default function WatchPage() {
   const params = useParams();
@@ -15,6 +16,9 @@ export default function WatchPage() {
   const [item, setItem] = useState<MediaItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showNextEpisode, setShowNextEpisode] = useState(false);
+
+  // 2. Instantiate the hook to get the addToHistory function
+  const { addToHistory } = useWatchHistory();
 
   useEffect(() => {
     const loadMedia = async () => {
@@ -32,11 +36,20 @@ export default function WatchPage() {
     loadMedia();
   }, [params.category, params.id]);
 
+  // 3. Add a new useEffect to add the item to history once it's loaded
+  useEffect(() => {
+    if (item) {
+      // This will add the current movie/show to the user's watch history.
+      // The logic inside the hook handles moving it to the top if already watched.
+      addToHistory(item);
+    }
+  }, [item, addToHistory]); // This effect runs whenever 'item' changes
+
   useEffect(() => {
     if (item?.category === "tv") {
       const nextEpisodeTimer = setTimeout(() => {
         setShowNextEpisode(true);
-      }, 5000);
+      }, 5000); // Show next episode suggestion after 5 seconds
       return () => clearTimeout(nextEpisodeTimer);
     }
   }, [item]);
@@ -64,7 +77,7 @@ export default function WatchPage() {
           <h1 className="text-3xl font-bold mb-4">Content Not Found</h1>
           <button
             onClick={handleGoBack}
-            className="flex items-center gap-2 bg-red-600 hover-bg-red-700 text-white py-2 px-4 rounded-md transition-colors"
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md transition-colors"
           >
             <ChevronLeft size={20} />
             Go Back
@@ -88,8 +101,7 @@ export default function WatchPage() {
 
       <div className="relative w-full">
         <div className="w-full h-screen bg-black">
-          <VideoPlayer trailerKey={item.trailerKey} />{" "}
-          {/* Corrected from VideoJuliaPlayer */}
+          <VideoPlayer trailerKey={item.trailerKey} />
         </div>
 
         {item.category === "tv" && showNextEpisode && (
