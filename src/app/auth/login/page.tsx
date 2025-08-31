@@ -64,7 +64,13 @@ export default function LoginPage() {
       );
 
       if (foundUser) {
-        login({ name: foundUser.name, email: foundUser.email });
+        // Note: This will cause the TypeScript error you saw before,
+        // because the UserProfile type now expects a `role` property.
+        // login({ name: foundUser.name, email: foundUser.email });
+
+        // A temporary fix is to manually add the role here for the local-only version:
+        login({ name: foundUser.name, email: foundUser.email, role: "USER" });
+
         router.push("/main/browse");
       } else {
         setShowSignupPrompt(true);
@@ -76,17 +82,6 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-black text-white">
-      <div className="absolute inset-0 z-0">
-        <Image
-          src="/images/backdrop_matrix.jpg"
-          alt="Background"
-          fill
-          priority
-          className="object-cover opacity-30"
-        />
-        <div className="absolute inset-0 bg-black/50" />
-      </div>
-
       <div className="relative z-10 flex flex-col flex-grow">
         <header className="py-6 px-4 sm:px-8">
           <div className="max-w-7xl mx-auto">
@@ -131,7 +126,6 @@ export default function LoginPage() {
                 )}
               </div>
 
-              {/* --- 3. WRAP PASSWORD INPUT FOR ICON POSITIONING --- */}
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -144,14 +138,12 @@ export default function LoginPage() {
                   }}
                   placeholder="Password"
                   required
-                  // Added right padding so text doesn't go under the icon
                   className={`w-full p-4 pr-12 rounded bg-gray-700 text-white border focus:outline-none focus:ring-2 transition-colors ${
                     errors.password
                       ? "border-red-500 ring-red-500"
                       : "border-gray-600 focus:border-red-500 ring-transparent focus:ring-red-500"
                   }`}
                 />
-                {/* --- 4. THE VISIBILITY TOGGLE BUTTON WITH WHITE ICON --- */}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -169,8 +161,7 @@ export default function LoginPage() {
                 type="submit"
                 className="cursor-pointer w-full py-3 rounded bg-red-600 text-white font-medium hover:bg-red-700 transition duration-200"
               >
-                {" "}
-                Sign In{" "}
+                Sign In
               </button>
               <div className="flex items-center justify-between text-zinc-400 text-sm">
                 <label className="flex items-center cursor-pointer">
@@ -183,8 +174,7 @@ export default function LoginPage() {
                   <span className="ml-2">Remember me</span>
                 </label>
                 <Link href="/auth/forgot-password" className="hover:underline">
-                  {" "}
-                  Need help?{" "}
+                  Need help?
                 </Link>
               </div>
             </form>
@@ -211,7 +201,6 @@ export default function LoginPage() {
 
             <div className="mt-12 text-zinc-400">
               <p>
-                {" "}
                 New to NetStream?{" "}
                 <Link
                   href="/auth/signup"
@@ -219,16 +208,15 @@ export default function LoginPage() {
                 >
                   Sign up now
                 </Link>
-                .{" "}
+                .
               </p>
               <p className="mt-4 text-xs">
-                {" "}
-                This page is protected by Google reCAPTCHA to ensure youre not
-                a bot.{" "}
+                This page is protected by Google reCAPTCHA to ensure
+                you`&apos;`re not a bot.{" "}
                 <a href="#" className="text-blue-500 hover:underline ml-1">
                   Learn more
                 </a>
-                .{" "}
+                .
               </p>
             </div>
           </motion.div>

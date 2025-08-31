@@ -95,10 +95,6 @@ export default function ProfilePage() {
                           <span className="text-gray-400">Email</span>
                           <span>{user?.email || "..."}</span>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-400">Member Since</span>
-                          <span>August 2025</span>
-                        </div>
                       </div>
                     </div>
 

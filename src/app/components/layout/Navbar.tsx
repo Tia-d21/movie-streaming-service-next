@@ -11,8 +11,6 @@ export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-
-  // --- 1. ADD NEW STATE TO MANAGE THE LOGOUT LOADING SCREEN ---
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const pathname = usePathname();
@@ -31,24 +29,18 @@ export default function Navbar() {
     setShowLogoutConfirm(true);
   };
 
-  // --- 2. UPDATE THE LOGOUT LOGIC TO INCLUDE THE LOADING STATE ---
   const confirmLogout = () => {
-    // First, close the confirmation modal
     setShowLogoutConfirm(false);
-    // Then, show our full-screen loading overlay
     setIsLoggingOut(true);
 
-    // Use a timer to simulate the secure logout process and give feedback
     const timer = setTimeout(() => {
-      logout(); // Clear the user's session
-      router.push("/main/browse"); // Redirect to the home page
-      setIsLoggingOut(false); // Clean up the state
-    }, 2000); // 2-second delay for a better UX
+      logout();
+      router.push("/main/browse");
+      setIsLoggingOut(false);
+    }, 2000);
 
-    // Clean up the timer if the component unmounts unexpectedly
     return () => clearTimeout(timer);
   };
-  // --- END OF LOGIC UPDATE ---
 
   const cancelLogout = () => {
     setShowLogoutConfirm(false);
@@ -131,9 +123,7 @@ export default function Navbar() {
               >
                 <Search className="h-5 w-5" />
               </Link>
-              <button className="text-gray-300 hover:text-white">
-                <Bell className="h-5 w-5" />
-              </button>
+
               <div className="relative">
                 <button
                   className="flex items-center text-gray-300 hover:text-white"
@@ -172,6 +162,20 @@ export default function Navbar() {
                           >
                             Settings
                           </Link>
+
+                          {/* --- CODE ADDED HERE --- */}
+                          {/* This link will only appear if the logged-in user has the 'ADMIN' role. */}
+                          {user?.role === "ADMIN" && (
+                            <Link
+                              href="/admin"
+                              onClick={() => setShowProfileMenu(false)}
+                              className="block px-4 py-2 text-sm text-yellow-400 hover:bg-gray-800 hover:text-yellow-300"
+                            >
+                              Admin Panel
+                            </Link>
+                          )}
+                          {/* --- END OF ADDED CODE --- */}
+
                           <div className="my-1 border-t border-gray-700" />
                           <button
                             onClick={handleLogoutClick}
@@ -236,7 +240,7 @@ export default function Navbar() {
         )}
       </AnimatePresence>
 
-      {/* --- 3. ADD THE NEW LOGGING OUT LOADING OVERLAY --- */}
+      {/* Logging Out Loading Overlay */}
       <AnimatePresence>
         {isLoggingOut && (
           <motion.div
