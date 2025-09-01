@@ -8,35 +8,46 @@ datasource db {
 }
 
 model User {
-  id             String         @id @default(uuid())
-  name           String
-  email          String         @unique
-  password       String
-  role           String         @default("USER")
-  createdAt      DateTime       @default(now())
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+
+  // Relations
+  favorites      Favorite[]
+  mylist         MyList[]
+  ratings        Rating[]
+  feedbacks      Feedback[]
   watchHistories WatchHistory[]
 }
 
 model Movie {
-  id             Int            @id @default(autoincrement())
-  title          String
-  description    String
-  genre          String         // Keep for backward compatibility
-  categoryId     String?        // New field for relation
-  year           Int
-  url            String
-  rating         Float?         // New field
-  createdAt      DateTime       @default(now())
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String
+  genre       String
+  categoryId  String?
+  year        Int
+  releaseDate DateTime?
+  url         String
+  rating      Float?
+  createdAt   DateTime  @default(now())
+
+  // Relations
   category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  favorites      Favorite[]
+  mylist         MyList[]
+  ratings        Rating[]
+  feedbacks      Feedback[]
   watchHistories WatchHistory[]
 }
 
 model Category {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  movies    Movie[]
-  
-  
+  id     String  @id @default(cuid())
+  name   String  @unique
+  movies Movie[]
 }
 
 model WatchHistory {
@@ -47,4 +58,64 @@ model WatchHistory {
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  movieId   Int
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  movie Movie @relation(fields: [movieId], references: [id])
+
+  @@unique([userId, movieId])
+}
+
+model MyList {
+  id        String       @id @default(uuid())
+  userId    String
+  movieId   Int
+  status    MyListStatus @default(TOWATCH)
+  createdAt DateTime     @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  movie Movie @relation(fields: [movieId], references: [id])
+
+  @@unique([userId, movieId])
+}
+
+enum MyListStatus {
+  TOWATCH
+  WATCHING
+  COMPLETED
+}
+
+model Rating {
+  id        String   @id @default(uuid())
+  userId    String
+  movieId   Int
+  value     Int // 1–5 stars
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  movie Movie @relation(fields: [movieId], references: [id])
+
+  @@unique([userId, movieId])
+}
+
+model Feedback {
+  id        String   @id @default(uuid())
+  userId    String
+  movieId   Int?
+  message   String
+  createdAt DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id])
+  movie Movie? @relation(fields: [movieId], references: [id])
+}
+
+enum Role {
+  USER
+  ADMIN
 }

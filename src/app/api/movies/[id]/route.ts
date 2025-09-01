@@ -5,9 +5,16 @@ import { prisma } from '@/lib/prisma';
 // GET movie by id
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const movieId = Number(params.id);
     const movie = await prisma.movie.findUnique({
-      where: { id: Number(params.id) },
-      include: { category: { select: { id: true, name: true } } },
+      where: { id: movieId },
+      include: {
+        category: { select: { id: true, name: true } },
+        favorites: { include: { user: { select: { id: true, name: true } } } },
+        mylist: { include: { user: { select: { id: true, name: true } } } },
+        ratings: { include: { user: { select: { id: true, name: true } } } },
+        feedbacks: { include: { user: { select: { id: true, name: true } } } },
+      },
     });
 
     if (!movie) return NextResponse.json({ error: 'Movie not found' }, { status: 404 });
@@ -46,7 +53,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const updatedMovie = await prisma.movie.update({
       where: { id: Number(params.id) },
       data: dataToUpdate,
-      include: { category: { select: { id: true, name: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        favorites: { include: { user: { select: { id: true, name: true } } } },
+        mylist: { include: { user: { select: { id: true, name: true } } } },
+        ratings: { include: { user: { select: { id: true, name: true } } } },
+        feedbacks: { include: { user: { select: { id: true, name: true } } } },
+      },
     });
 
     return NextResponse.json(updatedMovie);

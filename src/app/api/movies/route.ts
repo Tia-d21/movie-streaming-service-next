@@ -7,8 +7,15 @@ export async function GET(req: NextRequest) {
   try {
     const movies = await prisma.movie.findMany({
       orderBy: { createdAt: 'desc' },
-      include: { category: { select: { id: true, name: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        favorites: { include: { user: { select: { id: true, name: true } } } },
+        mylist: { include: { user: { select: { id: true, name: true } } } },
+        ratings: { include: { user: { select: { id: true, name: true } } } },
+        feedbacks: { include: { user: { select: { id: true, name: true } } } },
+      },
     });
+
     return NextResponse.json(movies);
   } catch (error: any) {
     console.error('Error fetching movies:', error);
@@ -19,7 +26,6 @@ export async function GET(req: NextRequest) {
 // POST create new movie (admin only)
 export async function POST(req: NextRequest) {
   try {
-    // Admin check with proper error handling
     const admin = await adminAuth(req).catch((err: any) =>
       NextResponse.json({ error: err.message || 'Unauthorized' }, { status: 401 })
     );
@@ -28,12 +34,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { title, description, genre, year, url, categoryId, rating } = body;
 
-    // Validate required fields
     if (!title || !description || !year || !url) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Validate category if provided
     let validCategoryId: string | null = null;
     if (categoryId) {
       const category = await prisma.category.findUnique({ where: { id: categoryId } });
@@ -50,6 +54,13 @@ export async function POST(req: NextRequest) {
         url,
         rating: rating || null,
         categoryId: validCategoryId,
+      },
+      include: {
+        category: { select: { id: true, name: true } },
+        favorites: true,
+        mylist: true,
+        ratings: true,
+        feedbacks: true,
       },
     });
 
