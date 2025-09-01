@@ -2,89 +2,65 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/middlewares/auth';
 import { prisma } from '@/lib/prisma';
 
-// GET all favorites of logged-in user
+const TMDB_API_KEY = process.env.TMDB_API_KEY;
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+
+// Helper to fetch TMDB movie details
+async function fetchMovieDetails(movieId: number) {
+  const res = await fetch(`${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}&language=en-US`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+// GET all favorites
 export async function GET(req: NextRequest) {
-  try {
-    const user = await authMiddleware(req);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = await authMiddleware(req);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const favorites = await prisma.favorite.findMany({
-      where: { userId: user.userId },
-      include: { movie: true },
-      orderBy: { createdAt: 'desc' },
-    });
+  const favorites = await prisma.favorite.findMany({
+    where: { userId: user.userId },
+    orderBy: { createdAt: 'desc' }
+  });
 
-    // Map only the movie details to send to frontend
-    const favoriteMovies = favorites.map(fav => ({
-      id: fav.movie.id,
-      title: fav.movie.title,
-      description: fav.movie.description,
-      year: fav.movie.year,
-      url: fav.movie.url,
-      rating: fav.movie.rating,
-      categoryId: fav.movie.categoryId,
-      createdAt: fav.movie.createdAt,
-    }));
+  const favoriteMovies = await Promise.all(
+    favorites.map(async (fav) => {
+      const movie = await fetchMovieDetails(fav.movieId);
+      return movie ? { ...movie, addedAt: fav.createdAt } : { movieId: fav.movieId, addedAt: fav.createdAt };
+    })
+  );
 
-    return NextResponse.json(favoriteMovies);
-  } catch (error) {
-    console.error('Error fetching favorites:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+  return NextResponse.json(favoriteMovies);
 }
 
-// POST add a movie to favorites
+// POST add a favorite
 export async function POST(req: NextRequest) {
-  try {
-    const user = await authMiddleware(req);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = await authMiddleware(req);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { movieId } = await req.json();
-    if (!movieId) return NextResponse.json({ error: 'movieId is required' }, { status: 400 });
-
-    const existing = await prisma.favorite.findUnique({
-      where: { userId_movieId: { userId: user.userId, movieId } },
-    });
-    if (existing) return NextResponse.json({ message: 'Already in favorites' });
-
-    const favorite = await prisma.favorite.create({
-      data: { userId: user.userId, movieId },
-      include: { movie: true },
-    });
-
-    return NextResponse.json({
-      id: favorite.movie.id,
-      title: favorite.movie.title,
-      description: favorite.movie.description,
-      year: favorite.movie.year,
-      url: favorite.movie.url,
-      rating: favorite.movie.rating,
-      categoryId: favorite.movie.categoryId,
-      createdAt: favorite.movie.createdAt,
-    }, { status: 201 });
-  } catch (error) {
-    console.error('Error adding favorite:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  const { movieId } = await req.json();
+  if (!movieId || typeof movieId !== 'number') {
+    return NextResponse.json({ error: 'movieId is required and must be a number' }, { status: 400 });
   }
+
+  const existing = await prisma.favorite.findFirst({ where: { userId: user.userId, movieId } });
+  if (existing) return NextResponse.json({ message: 'Already in favorites' });
+
+  const favorite = await prisma.favorite.create({ data: { userId: user.userId, movieId } });
+  const movie = await fetchMovieDetails(movieId);
+
+  return NextResponse.json(movie ? { ...movie, addedAt: favorite.createdAt } : { movieId, addedAt: favorite.createdAt }, { status: 201 });
 }
 
-// DELETE remove a movie from favorites
+// DELETE remove a favorite
 export async function DELETE(req: NextRequest) {
-  try {
-    const user = await authMiddleware(req);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = await authMiddleware(req);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { movieId } = await req.json();
-    if (!movieId) return NextResponse.json({ error: 'movieId is required' }, { status: 400 });
-
-    await prisma.favorite.delete({
-      where: { userId_movieId: { userId: user.userId, movieId } },
-    });
-
-    return NextResponse.json({ message: 'Removed from favorites' });
-  } catch (error: any) {
-    console.error('Error deleting favorite:', error);
-    if (error.code === 'P2025') return NextResponse.json({ error: 'Favorite not found' }, { status: 404 });
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  const { movieId } = await req.json();
+  if (!movieId || typeof movieId !== 'number') {
+    return NextResponse.json({ error: 'movieId is required and must be a number' }, { status: 400 });
   }
+
+  await prisma.favorite.deleteMany({ where: { userId: user.userId, movieId } });
+  return NextResponse.json({ message: 'Removed from favorites' });
 }

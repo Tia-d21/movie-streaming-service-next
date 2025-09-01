@@ -7,7 +7,6 @@ export async function GET(req: NextRequest) {
     await adminAuth(req); // Ensure only admin can access
 
     const totalUsers = await prisma.user.count();
-    const totalMovies = await prisma.movie.count();
     const totalFavorites = await prisma.favorite.count();
     const totalMyList = await prisma.myList.count();
     const totalRatings = await prisma.rating.count();
@@ -15,7 +14,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       totalUsers,
-      totalMovies,
       totalFavorites,
       totalMyList,
       totalRatings,
@@ -23,6 +21,9 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error fetching admin dashboard:', error);
-    return NextResponse.json({ error: error.message || 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      { error: error.message || 'Unauthorized' },
+      { status: 401 }
+    );
   }
 }
