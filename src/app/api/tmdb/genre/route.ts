@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchTMDB } from "@/lib/tmdb";
 
-// Map genre names to TMDB genre IDs
 const GENRE_MAP: Record<string, number> = {
   action: 28,
   adventure: 12,
@@ -40,6 +39,7 @@ export async function GET(req: NextRequest) {
           return NextResponse.json({ error: "Invalid genre" }, { status: 400 });
         }
         const genreId = GENRE_MAP[genre.toLowerCase()];
+        // fixed: use proper discover endpoint
         endpoint = `/discover/movie?with_genres=${genreId}`;
         break;
       default:
