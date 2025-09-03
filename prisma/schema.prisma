@@ -1,4 +1,4 @@
-generator client {
+generator client { 
   provider = "prisma-client-js"
 }
 
@@ -12,31 +12,45 @@ model User {
   name           String
   email          String         @unique
   password       String
-  role           String         @default("USER")
   createdAt      DateTime       @default(now())
+  role           Role           @default(USER)
+  favorites      Favorite[]
+  feedbacks      Feedback[]
+  mylist         MyList[]
+  ratings        Rating[]
   watchHistories WatchHistory[]
 }
 
-model Movie {
-  id             Int            @id @default(autoincrement())
-  title          String
-  description    String
-  genre          String         // Keep for backward compatibility
-  categoryId     String?        // New field for relation
-  year           Int
-  url            String
-  rating         Float?         // New field
-  createdAt      DateTime       @default(now())
-  category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  watchHistories WatchHistory[]
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  movieId   Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, movieId])
 }
 
-model Category {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  movies    Movie[]
-  
-  
+model MyList {
+  id        String       @id @default(uuid())
+  userId    String
+  movieId   Int
+  status    MyListStatus @default(TOWATCH)
+  createdAt DateTime     @default(now())
+  user      User         @relation(fields: [userId], references: [id])
+
+  @@unique([userId, movieId])
+}
+
+model Rating {
+  id        String   @id @default(uuid())
+  userId    String
+  movieId   Int
+  value     Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, movieId])
 }
 
 model WatchHistory {
@@ -44,7 +58,25 @@ model WatchHistory {
   userId    String
   movieId   Int
   watchedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+model Feedback {
+  id        String   @id @default(uuid())
+  userId    String
+  movieId   Int?
+  message   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+enum MyListStatus {
+  TOWATCH
+  WATCHING
+  COMPLETED
+}
+
+enum Role {
+  USER
+  ADMIN
 }
