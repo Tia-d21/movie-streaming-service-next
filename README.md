@@ -8,10 +8,10 @@ Users can browse, search, and stream movies with a modern UI and optimized perfo
 ## 🚀 Tech Stack  
 
 - **Frontend:** [Next.js](https://nextjs.org), [TailwindCSS](https://tailwindcss.com)  
-- **Backend:** [Prisma](https://www.prisma.io), [Node.js](https://nodejs.org)  
+- **Backend:** [Prisma](https://www.prisma.io), [Next.js](https://nextjs.org)  
 - **Database:** [PostgreSQL](https://www.postgresql.org)  
 - **API:** TDBM API (Movies data)  
-- **Deployment:** [Vercel](https://vercel.com) (frontend) + [Render](https://render.com) (backend)  
+- **Deployment:** [Vercel](https://vercel.com) (frontend) + [Supabase](https://supabase.com) (backend)  
 
 ---
 
