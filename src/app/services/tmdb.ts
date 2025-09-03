@@ -1,5 +1,11 @@
 import { MediaItem } from "../data/mockData";
 
+// TODO: DEPLOYMENT SETUP - TMDB API Integration
+// 1. Get your free API key from: https://www.themoviedb.org/settings/api
+// 2. For Vercel deployment: Add NEXT_PUBLIC_TMDB_API_KEY in environment variables
+// 3. For Render backend: Add TMDB_API_KEY in environment variables
+// 4. Replace the placeholder key below with your actual TMDB API key
+// 5. The app will automatically switch from mock data to real TMDB data
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const BASE_URL = "https://api.themoviedb.org/3";
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/";
@@ -131,6 +137,7 @@ export const fetchMediaDetails = async (
   );
   return details ? formatMediaItem(details as TMDBItem) : null;
 };
+
 
 export const getGenreList = async (
   type: "movie" | "tv"
