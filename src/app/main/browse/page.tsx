@@ -7,7 +7,7 @@ import HeroBanner from "../../../app/components/ui/HeroBanner";
 import Carousel, { CategoryType } from "../../../app/components/ui/Carousel";
 import Navbar from "../../../app/components/layout/Navbar";
 import Footer from "../../../app/components/layout/Footer";
-import { MediaItem } from "../../../app/data/mockData";
+import { MediaItem, mockMovies } from "../../../app/data/mockData";
 import {
   fetchTrendingByPage,
   fetchPopularMoviesByPage,
@@ -62,10 +62,10 @@ export default function BrowsePage() {
       const allResults = await Promise.all([...initialPromises, ...genrePromises]);
 
       const initialCategories: Category[] = [
-        { id: "trending", title: "Trending Now", items: allResults[0]?.results || [], mediaType: 'movie' },
-        { id: "popular-movies", title: "Popular Movies", items: allResults[1]?.results || [], mediaType: 'movie' },
-        { id: "tv-shows", title: "Top Rated TV Shows", items: allResults[2]?.results || [], mediaType: 'tv' },
-        { id: "new-releases", title: "Upcoming Movies", items: allResults[3]?.results || [], mediaType: 'movie' },
+        { id: "trending", title: "Trending Now", items: allResults[0]?.results || mockMovies, mediaType: 'movie' },
+        { id: "popular-movies", title: "Popular Movies", items: allResults[1]?.results || mockMovies, mediaType: 'movie' },
+        { id: "tv-shows", title: "Top Rated TV Shows", items: allResults[2]?.results || mockMovies, mediaType: 'tv' },
+        { id: "new-releases", title: "Upcoming Movies", items: allResults[3]?.results || mockMovies, mediaType: 'movie' },
       ];
 
       const genreCategories: Category[] = GENRE_CATEGORIES_TO_DISPLAY.map((genreName, index) => {
@@ -73,7 +73,7 @@ export default function BrowsePage() {
         return {
           id: `genre-${genreId}`,
           title: genreName,
-          items: allResults[4 + index]?.results || [],
+          items: allResults[4 + index]?.results || mockMovies.slice(0, 3),
           genreId: genreId,
           mediaType: 'movie',
         };
@@ -104,6 +104,7 @@ export default function BrowsePage() {
       setFilteredCategories(allCategories);
     }
   }, [categoryParam, allCategories]);
+
 
   useEffect(() => {
     if (heroBannerPool.length === 0) return;
