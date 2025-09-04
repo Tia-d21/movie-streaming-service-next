@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST add a favorite
+// POST add a movie to favorites
 export async function POST(req: NextRequest) {
   try {
     const user = await authMiddleware(req);
@@ -62,8 +62,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(movie);
     }
 
-  const favorite = await prisma.favorite.create({ data: { userId: user.userId, movieId } });
-  const movie = await fetchMovieDetails(movieId);
+    const favorite = await prisma.favorite.create({
+      data: { userId: user.userId, movieId },
+      include: { movie: true },
+    });
 
     return NextResponse.json(favorite.movie, { status: 201 });
   } catch (error) {
