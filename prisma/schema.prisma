@@ -85,14 +85,6 @@ model Rating {
   @@unique([userId, movieId])
 }
 
-model WatchHistory {
-  id        Int      @id @default(autoincrement())
-  userId    String
-  movieId   Int
-  watchedAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
 model Feedback {
   id        String   @id @default(uuid())
   userId    String
