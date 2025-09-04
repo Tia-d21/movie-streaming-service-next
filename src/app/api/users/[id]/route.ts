@@ -21,18 +21,17 @@ export async function GET(
     }
 
     const userData = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: params.id },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
         createdAt: true,
-        favorites: { select: { movieId: true, createdAt: true } },
-        mylist: { select: { movieId: true, status: true, createdAt: true } },
-        ratings: { select: { movieId: true, value: true, createdAt: true } },
-        feedbacks: { select: { id: true, movieId: true, message: true, createdAt: true } },
-        watchHistories: { select: { movieId: true, watchedAt: true } },
+        favorites: { select: { movieId: true } },
+        mylist: { select: { movieId: true, status: true } },
+        ratings: { select: { movieId: true, value: true } },
+        feedbacks: { select: { id: true, message: true } },
       },
     });
 
@@ -64,7 +63,7 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const { role } = body;
+    const { name, email, password, role } = body;
 
     const dataToUpdate: Prisma.UserUpdateInput = {};
 
