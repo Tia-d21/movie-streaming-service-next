@@ -31,7 +31,7 @@ Users can browse, search, and stream movies with a modern UI and optimized perfo
 🔗 **Live Frontend:** [movie-streaming-service.vercel.app](#)  
 🔗 **Live Backend API:** [movie-streaming-service.onrender.com](#)  
 
-*(replace `#` with your actual deployment links)*  
+
 
 ---
 
