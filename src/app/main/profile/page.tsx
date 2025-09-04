@@ -15,18 +15,10 @@ import { fetchWithAuth } from "../../../lib/apiHelper";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const {
-    user,
-    isLoading: isUserLoading,
-    token,
-    updateUserProfile,
-  } = useUserProfile();
-  const {
-    history,
-    isLoading: isHistoryLoading,
-    fetchHistory,
-    removeFromHistory,
-  } = useWatchHistory();
+  const { user, isLoading: isUserLoading, token, updateUserProfile } =
+    useUserProfile();
+  const { history, isLoading: isHistoryLoading, fetchHistory, removeFromHistory } =
+    useWatchHistory();
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState(user?.name ?? "");
@@ -34,21 +26,15 @@ export default function ProfilePage() {
   const [apiError, setApiError] = useState("");
 
   useEffect(() => {
-    if (user) {
-      setNewName(user.name);
-    }
+    if (user) setNewName(user.name);
   }, [user]);
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push("/auth/login");
-    }
+    if (!isUserLoading && !user) router.push("/auth/login");
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    if (token) {
-      fetchHistory();
-    }
+    if (token) fetchHistory();
   }, [token, fetchHistory]);
 
   const handleEditClick = () => {
@@ -104,6 +90,7 @@ export default function ProfilePage() {
       <Navbar />
       <div className="pt-24 pb-10 px-4 md:px-8 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row gap-8">
+          {/* Sidebar */}
           <div className="md:w-1/4">
             <div className="bg-gray-900 rounded-lg p-6 sticky top-24">
               <div className="flex items-center space-x-4 mb-6">
@@ -117,6 +104,8 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+
+          {/* Main Content */}
           <div className="md:w-3/4">
             <div className="bg-gray-900 rounded-lg p-6">
               <h2 className="text-2xl font-bold mb-6">Account Information</h2>
@@ -125,68 +114,73 @@ export default function ProfilePage() {
                   {apiError}
                 </p>
               )}
+
               <div className="space-y-8">
+                {/* Profile Details */}
                 <div>
                   <h3 className="text-lg font-medium mb-2">Profile Details</h3>
                   <div className="bg-gray-800 rounded-lg p-4 space-y-4">
-                    <div className="flex justify-between items-center min-h-[40px]">
-                      <span className="text-gray-400">Name</span>
-                      {isEditingName ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={newName}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                              setNewName(e.target.value)
-                            }
-                            className="bg-gray-700 text-white p-1 px-2 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                            autoFocus
-                          />
-                          <button
-                            onClick={(e: React.MouseEvent<HTMLButtonElement>) =>
-                              handleSaveClick()
-                            }
-                            disabled={isSaving}
-                            className="text-green-400 hover:text-green-300 disabled:opacity-50"
-                          >
-                            <Check size={20} />
-                          </button>
-                          <button
-                            onClick={(e: React.MouseEvent<HTMLButtonElement>) =>
-                              handleCancelClick()
-                            }
-                            disabled={isSaving}
-                            className="text-red-500 hover:text-red-400 disabled:opacity-50"
-                          >
-                            <XCircle size={20} />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3">
-                          <span>{user.name}</span>
-                          <button
-                            onClick={(e: React.MouseEvent<HTMLButtonElement>) =>
-                              handleEditClick()
-                            }
-                            className="text-gray-400 hover:text-white"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    {/* Name */}
+                <div className="flex justify-between items-center min-h-[40px]">
+  <span className="text-gray-400">Name</span>
+
+  {isEditingName ? (
+    <div className="flex items-center gap-2">
+      <label htmlFor="name" className="sr-only">Name</label>
+<input
+  id="name"
+  type="text"
+  value={newName}
+  onChange={(e) => setNewName(e.target.value)}
+  className="bg-gray-700 text-white p-1 px-2 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+  autoFocus
+/>
+
+      <button
+        onClick={handleSaveClick}
+        disabled={isSaving}
+        className="text-green-400 hover:text-green-300 disabled:opacity-50"
+        aria-label="Save name"
+      >
+        <Check size={20} />
+      </button>
+      <button
+        onClick={handleCancelClick}
+        disabled={isSaving}
+        className="text-red-500 hover:text-red-400 disabled:opacity-50"
+        aria-label="Cancel editing"
+      >
+        <XCircle size={20} />
+      </button>
+    </div>
+  ) : (
+    <div className="flex items-center gap-2">
+      <span>{user.name}</span>
+      <button
+        onClick={handleEditClick}
+        className="text-gray-400 hover:text-white"
+        aria-label="Edit name"
+      >
+        <Pencil size={16} />
+      </button>
+    </div>
+  )}
+</div>
+
+                    {/* Email */}
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400">Email</span>
                       <span>{user.email}</span>
                     </div>
                   </div>
                 </div>
+
+                {/* Security */}
                 <div>
                   <h3 className="text-lg font-medium mb-2">Security</h3>
                   <div className="bg-gray-800 rounded-lg p-4">
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400">Password</span>
-
                       <Link href="/main/profile/change-password">
                         <motion.button
                           whileHover={{ scale: 1.05 }}
@@ -201,7 +195,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Watch History Section now uses the global state */}
+                {/* Watch History */}
                 <div>
                   <h3 className="text-lg font-medium mb-2">Watch History</h3>
                   <div className="bg-gray-800 rounded-lg p-4">
@@ -234,9 +228,7 @@ export default function ProfilePage() {
                             <MovieCard {...watchedItem} />
                             <p className="text-xs text-center text-gray-400 mt-2">
                               Watched{" "}
-                              {new Date(
-                                watchedItem.watchedAt
-                              ).toLocaleDateString()}
+                              {new Date(watchedItem.watchedAt).toLocaleDateString()}
                             </p>
                           </div>
                         ))}
@@ -250,6 +242,7 @@ export default function ProfilePage() {
                     )}
                   </div>
                 </div>
+
               </div>
             </div>
           </div>
