@@ -1,21 +1,26 @@
 "use client";
 
-import { useEffect } from "react";
+import * as React from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "../../../app/components/layout/Navbar";
 import Footer from "../../../app/components/layout/Footer";
 import MovieCard from "../../../app/components/ui/MovieCard";
-import { User, KeyRound, X } from "lucide-react";
+import { User, KeyRound, X, Pencil, Check, XCircle } from "lucide-react";
 import { useUserProfile } from "../../../app/hooks/useUserProfile";
 import { motion } from "framer-motion";
 import { useWatchHistory } from "../../../app/hooks/useWatchHistory";
+import { fetchWithAuth } from "../../../lib/apiHelper";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, isLoading: isUserLoading, token } = useUserProfile();
-
-  // Get the entire history state and functions from the global store
+  const {
+    user,
+    isLoading: isUserLoading,
+    token,
+    updateUserProfile,
+  } = useUserProfile();
   const {
     history,
     isLoading: isHistoryLoading,
@@ -23,20 +28,60 @@ export default function ProfilePage() {
     removeFromHistory,
   } = useWatchHistory();
 
-  // Protect the route
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newName, setNewName] = useState(user?.name ?? "");
+  const [isSaving, setIsSaving] = useState(false);
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      setNewName(user.name);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push("/auth/login");
     }
   }, [user, isUserLoading, router]);
 
-  // Trigger the initial fetch of the watch history when the user is logged in
   useEffect(() => {
-    // We check for the token to ensure we're authenticated before fetching
     if (token) {
       fetchHistory();
     }
   }, [token, fetchHistory]);
+
+  const handleEditClick = () => {
+    setApiError("");
+    setIsEditingName(true);
+  };
+
+  const handleCancelClick = () => {
+    setNewName(user?.name ?? "");
+    setIsEditingName(false);
+  };
+
+  const handleSaveClick = async () => {
+    if (!user || newName.trim() === "" || newName === user.name) {
+      setIsEditingName(false);
+      return;
+    }
+
+    setIsSaving(true);
+    setApiError("");
+    try {
+      const updatedUser = await fetchWithAuth(`/api/users/${user.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ name: newName }),
+      });
+      updateUserProfile(updatedUser);
+      setIsEditingName(false);
+    } catch (error) {
+      setApiError((error as Error).message ?? "Failed to update name.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (isUserLoading || !user) {
     return (
@@ -75,13 +120,60 @@ export default function ProfilePage() {
           <div className="md:w-3/4">
             <div className="bg-gray-900 rounded-lg p-6">
               <h2 className="text-2xl font-bold mb-6">Account Information</h2>
+              {apiError && (
+                <p className="text-red-500 bg-red-900/50 p-3 rounded-md mb-4">
+                  {apiError}
+                </p>
+              )}
               <div className="space-y-8">
                 <div>
                   <h3 className="text-lg font-medium mb-2">Profile Details</h3>
                   <div className="bg-gray-800 rounded-lg p-4 space-y-4">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center min-h-[40px]">
                       <span className="text-gray-400">Name</span>
-                      <span>{user.name}</span>
+                      {isEditingName ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={newName}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                              setNewName(e.target.value)
+                            }
+                            className="bg-gray-700 text-white p-1 px-2 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                            autoFocus
+                          />
+                          <button
+                            onClick={(e: React.MouseEvent<HTMLButtonElement>) =>
+                              handleSaveClick()
+                            }
+                            disabled={isSaving}
+                            className="text-green-400 hover:text-green-300 disabled:opacity-50"
+                          >
+                            <Check size={20} />
+                          </button>
+                          <button
+                            onClick={(e: React.MouseEvent<HTMLButtonElement>) =>
+                              handleCancelClick()
+                            }
+                            disabled={isSaving}
+                            className="text-red-500 hover:text-red-400 disabled:opacity-50"
+                          >
+                            <XCircle size={20} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <span>{user.name}</span>
+                          <button
+                            onClick={(e: React.MouseEvent<HTMLButtonElement>) =>
+                              handleEditClick()
+                            }
+                            className="text-gray-400 hover:text-white"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400">Email</span>
@@ -94,6 +186,7 @@ export default function ProfilePage() {
                   <div className="bg-gray-800 rounded-lg p-4">
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400">Password</span>
+
                       <Link href="/main/profile/change-password">
                         <motion.button
                           whileHover={{ scale: 1.05 }}

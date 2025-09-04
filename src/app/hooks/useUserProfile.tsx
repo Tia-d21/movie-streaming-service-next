@@ -18,12 +18,15 @@ export type UserProfile = {
   role: "USER" | "ADMIN";
 };
 
+
 interface UserProfileContextType {
   user: UserProfile | null;
   isLoading: boolean;
   token: string | null;
   login: (token: string, userData: UserProfile) => void;
   logout: () => void;
+  // --- [NEW] Add a function to update the user's state ---
+  updateUserProfile: (updatedData: Partial<UserProfile>) => void;
 }
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(
@@ -47,25 +50,19 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   }, [router]);
 
   useEffect(() => {
-    // --- [FIX] This check prevents the hook from running on the server ---
     if (typeof window === "undefined") {
-      setIsLoading(false); // On server, we're not logged in, stop loading.
+      setIsLoading(false);
       return;
     }
-
     const initializeAuth = async () => {
       const storedToken = window.localStorage.getItem("authToken");
-
       if (storedToken) {
         try {
           const profileData = await fetchWithAuth("/api/users/me");
           if (profileData && profileData.id) {
             setUser(profileData);
             setToken(storedToken);
-            window.localStorage.setItem(
-              "userProfile",
-              JSON.stringify(profileData)
-            );
+            window.localStorage.setItem("userProfile", JSON.stringify(profileData));
           } else {
             logout();
           }
@@ -76,7 +73,6 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
       }
       setIsLoading(false);
     };
-
     initializeAuth();
   }, [logout]);
 
@@ -88,8 +84,21 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
     setToken(newToken);
     setUser(userData);
   };
+  
+  // --- [NEW] This function updates the user state and localStorage ---
+  const updateUserProfile = (updatedData: Partial<UserProfile>) => {
+    setUser(prevUser => {
+      if (!prevUser) return null;
+      const newUser = { ...prevUser, ...updatedData };
+      // Also update localStorage so the change persists on refresh
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("userProfile", JSON.stringify(newUser));
+      }
+      return newUser;
+    });
+  };
 
-  const value = { user, isLoading, token, login, logout };
+  const value = { user, isLoading, token, login, logout, updateUserProfile };
 
   return (
     <UserProfileContext.Provider value={value}>
