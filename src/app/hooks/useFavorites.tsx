@@ -6,87 +6,108 @@ import {
   useEffect,
   useContext,
   ReactNode,
+  useCallback,
 } from "react";
 import { MediaItem } from "../../app/data/mockData";
+import { useUserProfile } from "./useUserProfile";
+import { fetchWithAuth } from "../../lib/apiHelper";
 
-// Define the shape of the data and functions our context will provide
+// --- [FIX] Define the shape of a movie item coming from our backend API ---
+// We can reuse this interface across hooks if it's the same shape.
+interface MovieFromAPI {
+  id: number;
+  title: string;
+  posterPath?: string | null;
+  releaseYear?: number;
+  category?: "movie" | "tv";
+}
+
 interface FavoritesContextType {
   favorites: MediaItem[];
   isLoading: boolean;
-  addToFavorites: (item: MediaItem) => void;
-  removeFromFavorites: (id: string) => void;
   isFavorite: (id: string) => boolean;
-  toggleFavorite: (item: MediaItem) => void;
+  toggleFavorite: (item: MediaItem) => Promise<void>;
 }
 
-// 1. Create the context to hold our shared state
 const FavoritesContext = createContext<FavoritesContextType | undefined>(
   undefined
 );
 
-const getInitialFavorites = (): MediaItem[] => {
-  if (typeof window === "undefined") {
-    return [];
-  }
-  try {
-    const item = window.localStorage.getItem("favoritesList");
-    return item ? JSON.parse(item) : [];
-  } catch (error) {
-    console.error("Error parsing favoritesList from localStorage", error);
-    return [];
-  }
-};
-
-// 2. Create the Provider component that will wrap our application
 export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
   const [favorites, setFavorites] = useState<MediaItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { token } = useUserProfile();
 
-  useEffect(() => {
-    setFavorites(getInitialFavorites());
-    setIsLoading(false);
-  }, []);
-
-  useEffect(() => {
-    if (!isLoading) {
-      try {
-        window.localStorage.setItem("favoritesList", JSON.stringify(favorites));
-      } catch (error) {
-        console.error("Error saving favoritesList to localStorage", error);
-      }
+  const fetchFavorites = useCallback(async () => {
+    if (!token) {
+      setFavorites([]);
+      setIsLoading(false);
+      return;
     }
-  }, [favorites, isLoading]);
+    try {
+      setIsLoading(true);
+      const data = await fetchWithAuth("/api/users/favorite");
 
-  const addToFavorites = (item: MediaItem) => {
-    setFavorites((prevList) => {
-      if (prevList.some((media) => media.id === item.id)) {
-        return prevList;
-      }
-      return [...prevList, item];
-    });
-  };
+      // --- [FIX] Apply our new, specific type instead of 'any' ---
+      const formattedList = data.map((item: MovieFromAPI) => ({
+        ...item, // Spread properties from the API
+        id: item.id.toString(), // Ensure id is a string
+        // Provide fallbacks for any required MediaItem properties
+        overview: "",
+        backdropPath: "",
+        rating: "",
+        genres: [],
+        cast: [],
+        similar: [],
+      }));
+      setFavorites(formattedList);
+    } catch (error) {
+      console.error("Failed to fetch favorites:", error);
+      setFavorites([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
 
-  const removeFromFavorites = (id: string) => {
-    setFavorites((prevList) => prevList.filter((item) => item.id !== id));
-  };
+  useEffect(() => {
+    fetchFavorites();
+  }, [fetchFavorites]);
 
   const isFavorite = (id: string): boolean => {
     return favorites.some((item) => item.id === id);
   };
 
-  const toggleFavorite = (item: MediaItem) => {
-    if (isFavorite(item.id)) {
-      removeFromFavorites(item.id);
+  const toggleFavorite = async (item: MediaItem) => {
+    const currentlyFavorite = isFavorite(item.id);
+    const movieId = parseInt(item.id, 10);
+
+    if (currentlyFavorite) {
+      setFavorites((prev) => prev.filter((fav) => fav.id !== item.id));
     } else {
-      addToFavorites(item);
+      setFavorites((prev) => [...prev, item]);
+    }
+
+    try {
+      if (currentlyFavorite) {
+        await fetchWithAuth("/api/users/favorite", {
+          method: "DELETE",
+          body: JSON.stringify({ movieId }),
+        });
+      } else {
+        await fetchWithAuth("/api/users/favorite", {
+          method: "POST",
+          body: JSON.stringify(item),
+        });
+      }
+    } catch (error) {
+      console.error("Failed to toggle favorite:", error);
+      fetchFavorites();
     }
   };
 
   const value = {
     favorites,
     isLoading,
-    addToFavorites,
-    removeFromFavorites,
     isFavorite,
     toggleFavorite,
   };
@@ -98,7 +119,6 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// 3. The hook now simply consumes the shared context, making it globally aware
 export const useFavorites = () => {
   const context = useContext(FavoritesContext);
   if (context === undefined) {

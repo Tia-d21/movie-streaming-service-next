@@ -8,46 +8,35 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      Role     @default(USER)
-  createdAt DateTime @default(now())
-
-  // Relations
-  favorites      Favorite[]
-  mylist         MyList[]
-  ratings        Rating[]
-  feedbacks      Feedback[]
-  watchHistories WatchHistory[]
+  id           String         @id @default(uuid())
+  name         String
+  email        String         @unique
+  password     String
+  createdAt    DateTime       @default(now())
+  role         Role           @default(USER)
+  favorites    Favorite[]
+  feedbacks    Feedback[]
+  mylist       MyList[]
+  ratings      Rating[]
+  watchHistory WatchHistory[]
 }
 
 model Movie {
-  id          Int       @id @default(autoincrement())
-  title       String
-  description String
-  genre       String
-  categoryId  String?
-  year        Int
-  releaseDate DateTime?
-  url         String
-  rating      Float?
-  createdAt   DateTime  @default(now())
-
-  // Relations
-  category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  favorites      Favorite[]
-  mylist         MyList[]
-  ratings        Rating[]
-  feedbacks      Feedback[]
-  watchHistories WatchHistory[]
-}
-
-model Category {
-  id     String  @id @default(cuid())
-  name   String  @unique
-  movies Movie[]
+  id           Int            @id
+  title        String
+  description  String
+  genre        String
+  year         Int
+  url          String
+  createdAt    DateTime       @default(now())
+  rating       Float?
+  releaseDate  DateTime?
+  posterPath   String?
+  favorites    Favorite[]
+  feedbacks    Feedback[]
+  mylist       MyList[]
+  ratings      Rating[]
+  watchHistory WatchHistory[]
 }
 
 model WatchHistory {
@@ -55,9 +44,10 @@ model WatchHistory {
   userId    String
   movieId   Int
   watchedAt DateTime @default(now())
+  movie     Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  @@unique([userId, movieId])
 }
 
 model Favorite {
@@ -65,9 +55,8 @@ model Favorite {
   userId    String
   movieId   Int
   createdAt DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id])
-  movie Movie @relation(fields: [movieId], references: [id])
+  movie     Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, movieId])
 }
@@ -78,28 +67,20 @@ model MyList {
   movieId   Int
   status    MyListStatus @default(TOWATCH)
   createdAt DateTime     @default(now())
-
-  user  User  @relation(fields: [userId], references: [id])
-  movie Movie @relation(fields: [movieId], references: [id])
+  movie     Movie        @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, movieId])
-}
-
-enum MyListStatus {
-  TOWATCH
-  WATCHING
-  COMPLETED
 }
 
 model Rating {
   id        String   @id @default(uuid())
   userId    String
   movieId   Int
-  value     Int // 1–5 stars
+  value     Int
   createdAt DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id])
-  movie Movie @relation(fields: [movieId], references: [id])
+  movie     Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, movieId])
 }
@@ -110,9 +91,14 @@ model Feedback {
   movieId   Int?
   message   String
   createdAt DateTime @default(now())
+  movie     Movie?   @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 
-  user  User   @relation(fields: [userId], references: [id])
-  movie Movie? @relation(fields: [movieId], references: [id])
+enum MyListStatus {
+  TOWATCH
+  WATCHING
+  COMPLETED
 }
 
 enum Role {

@@ -4,113 +4,56 @@ import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useUserProfile } from "../../../app/hooks/useUserProfile";
-// --- 1. IMPORT THE ICONS ---
 import { Eye, EyeOff } from "lucide-react";
 
 export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [agreeTerms, setAgreeTerms] = useState(false);
-
-  // --- 2. ADD STATE TO MANAGE PASSWORD VISIBILITY ---
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  const [errors, setErrors] = useState({
-    name: "",
-    email: "",
-    password: "",
-    terms: "",
-  });
-
   const router = useRouter();
-  const { login } = useUserProfile();
 
-  const validate = () => {
-    // ... validation logic remains the same
-    const newErrors = { name: "", email: "", password: "", terms: "" };
-
-    const nameRegex = /^[a-zA-Z\s]+$/;
-    if (!name.trim()) {
-      newErrors.name = "Name is required.";
-    } else if (!nameRegex.test(name)) {
-      newErrors.name = "Name can only contain letters and spaces.";
-    }
-
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!email.trim()) {
-      newErrors.email = "Email is required.";
-    } else if (!emailRegex.test(email)) {
-      newErrors.email = "Please enter a valid email address.";
-    }
-
-    const isPasswordValid =
-      password.length >= 8 &&
-      /[A-Z]/.test(password) &&
-      /[a-z]/.test(password) &&
-      /[0-9]/.test(password) &&
-      /[!@#$%^&*]/.test(password);
-
-    if (!password) {
-      newErrors.password = "Password is required.";
-    } else if (!isPasswordValid) {
-      newErrors.password =
-        "Password must be 8+ characters and include uppercase, lowercase, a number, and a special symbol (!@#$%^&*).";
-    }
-
-    if (!agreeTerms) {
-      newErrors.terms = "You must agree to the terms to sign up.";
-    }
-
-    return newErrors;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
 
-    const validationErrors = validate();
-    const hasErrors = Object.values(validationErrors).some(
-      (error) => error !== ""
-    );
+    if (!name || !email || !password) {
+      setError("All fields are required.");
+      setIsLoading(false);
+      return;
+    }
 
-    if (hasErrors) {
-      setErrors(validationErrors);
-    } else {
-      setErrors({ name: "", email: "", password: "", terms: "" });
+    try {
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
 
-      try {
-        const newUser = { name, email, password };
-        const usersJSON = localStorage.getItem("registeredUsers");
-        type RegisteredUser = { name: string; email: string; password: string };
-        const users: RegisteredUser[] = usersJSON ? JSON.parse(usersJSON) : [];
+      const data = await response.json();
 
-        const userExists = users.some(
-          (user: RegisteredUser) => user.email === email
-        );
-
-        if (userExists) {
-          setErrors((prev) => ({
-            ...prev,
-            email: "An account with this email already exists. Please log in.",
-          }));
-          return;
-        }
-
-        users.push(newUser);
-        localStorage.setItem("registeredUsers", JSON.stringify(users));
-
-        // Note: This will cause the TypeScript error you saw before,
-        // because the UserProfile type now expects a `role` property.
-        // login({ name, email });
-
-        // A temporary fix is to manually add the role here for the local-only version:
-        login({ name, email, role: "USER" });
-
-        router.push("/main/browse");
-      } catch (error) {
-        console.error("Failed to sign up:", error);
+      if (!response.ok) {
+        throw new Error(data.error || "Signup failed. Please try again.");
       }
+
+      setSuccess("Account created successfully! Redirecting to login...");
+      setTimeout(() => {
+        router.push("/auth/login");
+      }, 2500);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unexpected error occurred.");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -133,130 +76,75 @@ export default function SignupPage() {
         >
           <h1 className="text-3xl font-bold mb-8">Sign Up</h1>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded-md text-center text-red-300">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="mb-4 p-3 bg-green-900/50 border border-green-500 rounded-md text-center text-green-300">
+              {success}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
               <input
                 type="text"
                 value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  if (errors.name) {
-                    setErrors((prevErrors) => ({ ...prevErrors, name: "" }));
-                  }
-                }}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="Name"
+                autoComplete="name"
                 required
-                className={`w-full p-4 rounded bg-zinc-800 text-white border focus:outline-none focus:border-red-600 transition-colors ${
-                  errors.name ? "border-red-500" : "border-zinc-700"
-                }`}
+                className="w-full p-4 rounded bg-zinc-800 text-white border border-zinc-700 focus:outline-none focus:border-red-600"
               />
-              {errors.name && (
-                <p className="text-red-500 text-sm mt-1">{errors.name}</p>
-              )}
             </div>
             <div>
               <input
                 type="email"
                 value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (errors.email) {
-                    setErrors((prevErrors) => ({ ...prevErrors, email: "" }));
-                  }
-                }}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email address"
+                autoComplete="email"
                 required
-                className={`w-full p-4 rounded bg-zinc-800 text-white border focus:outline-none focus:border-red-600 transition-colors ${
-                  errors.email ? "border-red-500" : "border-zinc-700"
-                }`}
+                className="w-full p-4 rounded bg-zinc-800 text-white border border-zinc-700 focus:outline-none focus:border-red-600"
               />
-              {errors.email && (
-                <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-              )}
             </div>
 
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (errors.password) {
-                    setErrors((prevErrors) => ({
-                      ...prevErrors,
-                      password: "",
-                    }));
-                  }
-                }}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Add a password"
+                autoComplete="new-password"
                 required
-                className={`w-full p-4 pr-12 rounded bg-zinc-800 text-white border focus:outline-none focus:border-red-600 transition-colors ${
-                  errors.password ? "border-red-500" : "border-zinc-700"
-                }`}
+                className="w-full p-4 pr-12 rounded bg-zinc-800 text-white border border-zinc-700 focus:outline-none focus:border-red-600"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className=" absolute inset-y-0 right-0 px-3 flex items-center text-white"
+                className="absolute inset-y-0 right-0 px-3 flex items-center text-white"
                 aria-label="Toggle password visibility"
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
-            {errors.password && (
-              <p className="text-red-500 text-sm mt-1  mb-2">
-                {errors.password}
-              </p>
-            )}
 
-            <div>
-              <div className="flex items-start">
-                <input
-                  type="checkbox"
-                  id="terms"
-                  checked={agreeTerms}
-                  onChange={(e) => {
-                    setAgreeTerms(e.target.checked);
-                    if (errors.terms) {
-                      setErrors((prevErrors) => ({ ...prevErrors, terms: "" }));
-                    }
-                  }}
-                  className="mt-1 mr-2 h-4 w-4"
-                  required
-                />
-                <label htmlFor="terms" className="text-sm text-zinc-400">
-                  {" "}
-                  I agree to the{" "}
-                  <a href="#" className="text-blue-500 hover:underline">
-                    Terms of Use
-                  </a>{" "}
-                  and{" "}
-                  <a href="#" className="text-blue-500 hover:underline">
-                    {" "}
-                    Privacy Policy
-                  </a>
-                  .{" "}
-                </label>
-              </div>
-              {errors.terms && (
-                <p className="text-red-500 text-sm mt-1">{errors.terms}</p>
-              )}
-            </div>
             <button
               type="submit"
-              className="cursor-pointer w-full py-3 rounded bg-red-600 text-white font-medium hover:bg-red-700 transition duration-200"
+              disabled={isLoading || !!success}
+              className="cursor-pointer w-full py-3 rounded bg-red-600 text-white font-medium hover:bg-red-700 transition duration-200 disabled:bg-red-900 disabled:cursor-not-allowed"
             >
-              {" "}
-              Sign Up{" "}
+              {isLoading ? "Creating Account..." : "Sign Up"}
             </button>
           </form>
           <div className="mt-12 text-zinc-400">
             <p>
-              {" "}
               Already have an account?{" "}
               <Link href="/auth/login" className="text-white hover:underline">
                 Sign in
-              </Link>{" "}
+              </Link>
             </p>
           </div>
         </motion.div>

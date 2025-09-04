@@ -8,7 +8,7 @@ import Image from "next/image";
 import VideoPlayer from "../../../../app/components/ui/VideoPlayer";
 import { fetchMediaDetails } from "../../../../app/services/tmdb";
 import { MediaItem } from "../../../../app/data/mockData";
-import { useWatchHistory } from "../../../../app/hooks/useWatchHistory"; // 1. Import the hook
+import { useWatchHistory } from "../../../../app/hooks/useWatchHistory";
 
 export default function WatchPage() {
   const params = useParams();
@@ -17,7 +17,7 @@ export default function WatchPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showNextEpisode, setShowNextEpisode] = useState(false);
 
-  // 2. Instantiate the hook to get the addToHistory function
+  // Get the addToHistory function from our global store
   const { addToHistory } = useWatchHistory();
 
   useEffect(() => {
@@ -25,7 +25,6 @@ export default function WatchPage() {
       setIsLoading(true);
       const category = params.category as "movie" | "tv";
       const id = params.id as string;
-
       if (category && id) {
         const foundItem = await fetchMediaDetails(id, category);
         setItem(foundItem);
@@ -36,20 +35,18 @@ export default function WatchPage() {
     loadMedia();
   }, [params.category, params.id]);
 
-  // 3. Add a new useEffect to add the item to history once it's loaded
+  // This effect simply calls the centralized function when the movie is loaded.
   useEffect(() => {
     if (item) {
-      // This will add the current movie/show to the user's watch history.
-      // The logic inside the hook handles moving it to the top if already watched.
       addToHistory(item);
     }
-  }, [item, addToHistory]); // This effect runs whenever 'item' changes
+  }, [item, addToHistory]);
 
   useEffect(() => {
     if (item?.category === "tv") {
       const nextEpisodeTimer = setTimeout(() => {
         setShowNextEpisode(true);
-      }, 5000); // Show next episode suggestion after 5 seconds
+      }, 5000);
       return () => clearTimeout(nextEpisodeTimer);
     }
   }, [item]);

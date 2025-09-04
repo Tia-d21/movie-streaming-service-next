@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authMiddleware } from '@/middlewares/auth';
-import { prisma } from '@/lib/prisma';
+import { authMiddleware } from 'middlewares/auth';
+import { prisma } from 'lib/prisma';
 
 export async function GET(
   request: NextRequest,
@@ -57,8 +57,9 @@ export async function GET(
         pages: Math.ceil(total / limit),
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching user watch history:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

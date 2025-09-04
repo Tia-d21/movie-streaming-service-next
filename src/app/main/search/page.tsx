@@ -6,14 +6,8 @@ import { Search as SearchIcon, X, ChevronDown } from "lucide-react";
 import Navbar from "../../../app/components/layout/Navbar";
 import Footer from "../../../app/components/layout/Footer";
 import MovieCard from "../../../app/components/ui/MovieCard";
-
-// Import the new discoverMedia function
-import {
-  searchMedia,
-  getGenreList,
-  discoverMedia,
-} from "../../../app/services/tmdb";
 import { MediaItem } from "../../../app/data/mockData";
+import * as tmdbApi from "../../../app/services/tmdb";
 
 interface Genre {
   id: number;
@@ -38,78 +32,68 @@ export default function SearchPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [pageTitle, setPageTitle] = useState("Discover Movies & TV Shows");
 
-  // Filter states
   const [selectedType, setSelectedType] = useState<"all" | "movie" | "tv">(
     "all"
   );
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<Genre[]>([]);
 
-  // State for genre lists and dropdown UI
   const [movieGenres, setMovieGenres] = useState<Genre[]>([]);
   const [tvGenres, setTvGenres] = useState<Genre[]>([]);
   const [isGenreDropdownOpen, setIsGenreDropdownOpen] = useState(false);
   const genreDropdownRef = useRef<HTMLDivElement>(null);
 
-  // --- DATA FETCHING: Get Genre Lists on Mount (Unchanged) ---
   useEffect(() => {
     const fetchGenres = async () => {
-      const movies = await getGenreList("movie");
-      const tv = await getGenreList("tv");
-      setMovieGenres(
-        movies.filter((genre) => POPULAR_GENRE_NAMES.has(genre.name))
-      );
-      setTvGenres(tv.filter((genre) => POPULAR_GENRE_NAMES.has(genre.name)));
+      const movies = await tmdbApi.getGenreList("movie");
+      const tv = await tmdbApi.getGenreList("tv");
+      if (Array.isArray(movies)) {
+        setMovieGenres(
+          movies.filter((genre) => POPULAR_GENRE_NAMES.has(genre.name))
+        );
+      }
+      if (Array.isArray(tv)) {
+        setTvGenres(tv.filter((genre) => POPULAR_GENRE_NAMES.has(genre.name)));
+      }
     };
     fetchGenres();
   }, []);
 
-  // --- REFACTORED: Main Data Fetching Logic ---
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       const genreIds = selectedGenres.map((g) => g.id);
 
-      // 1. If user is typing, prioritize search
       if (query.trim() !== "") {
         setPageTitle(`Results for "${query}"`);
-        const searchResults = await searchMedia(query, selectedType);
-
-        // Apply client-side filters on top of search results
-        let filtered = searchResults;
-        if (selectedYear) {
-          filtered = filtered.filter(
-            (item) => item.releaseYear?.toString() === selectedYear
-          );
-        }
-        if (genreIds.length > 0) {
-          filtered = filtered.filter((item) =>
-            genreIds.every((id) => item.genres.includes(id))
-          );
-        }
-        setResults(filtered);
-      }
-      // 2. If search is empty, but filters are active, use discover
-      else if (selectedType !== "all" || selectedYear || genreIds.length > 0) {
+        const searchResults = await tmdbApi.searchMedia(query, selectedType);
+        setResults(searchResults);
+      } else if (
+        selectedType !== "all" ||
+        selectedYear ||
+        genreIds.length > 0
+      ) {
         setPageTitle("Discover Results");
+        const allDiscoveredResults: MediaItem[] = [];
 
-        let movieResults: MediaItem[] = [];
-        let tvResults: MediaItem[] = [];
-
-        // Fetch movies if type is 'movie' or 'all'
         if (selectedType === "movie" || selectedType === "all") {
-          movieResults = await discoverMedia("movie", selectedYear, genreIds);
+          const movieResults = await tmdbApi.discoverMedia(
+            "movie",
+            selectedYear,
+            genreIds
+          );
+          allDiscoveredResults.push(...movieResults);
         }
-        // Fetch TV shows if type is 'tv' or 'all'
         if (selectedType === "tv" || selectedType === "all") {
-          tvResults = await discoverMedia("tv", selectedYear, genreIds);
+          const tvResults = await tmdbApi.discoverMedia(
+            "tv",
+            selectedYear,
+            genreIds
+          );
+          allDiscoveredResults.push(...tvResults);
         }
-
-        // Combine and set results
-        setResults([...movieResults, ...tvResults]);
-      }
-      // 3. If no query and no filters, show nothing.
-      else {
+        setResults(allDiscoveredResults);
+      } else {
         setResults([]);
         setPageTitle("Discover Movies & TV Shows");
       }
@@ -120,7 +104,6 @@ export default function SearchPage() {
     return () => clearTimeout(debounceTimer);
   }, [query, selectedType, selectedYear, selectedGenres]);
 
-  // --- Other useEffects and Handlers (Unchanged) ---
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -150,7 +133,7 @@ export default function SearchPage() {
     <main className="min-h-screen bg-black text-white">
       <Navbar />
       <div className="pt-24 pb-10 px-4 md:px-8 max-w-7xl mx-auto">
-        {/* --- RESTORED: Filter Controls --- */}
+        {/* --- [RESTORED] Filter Controls Section --- */}
         <div className="mb-8 p-4 bg-gray-900/50 rounded-lg">
           <div className="relative max-w-2xl mx-auto">
             <input
@@ -258,40 +241,7 @@ export default function SearchPage() {
           </div>
         </div>
 
-        {/* --- RESTORED: Applied Filters "Tags" --- */}
-        {(selectedYear || selectedGenres.length > 0) && (
-          <div className="mb-6 flex items-center flex-wrap gap-2">
-            <h3 className="text-sm font-semibold mr-2">Applied Filters:</h3>
-            {selectedYear && (
-              <div className="flex items-center bg-gray-700 text-white text-xs px-2 py-1 rounded-full">
-                Year: {selectedYear}
-                <button
-                  onClick={() => setSelectedYear("")}
-                  className="ml-2 text-gray-300 hover:text-white"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-            {selectedGenres.map((genre) => (
-              <div
-                key={genre.id}
-                className="flex items-center bg-gray-700 text-white text-xs px-2 py-1 rounded-full"
-              >
-                {genre.name}
-                <button
-                  onClick={() => handleGenreToggle(genre)}
-                  className="ml-2 text-gray-300 hover:text-white"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-            {/* The "Clear All" button that was here has been removed. */}
-          </div>
-        )}
-
-        {/* --- RESTORED & IMPROVED: Results Display --- */}
+        {/* --- [RESTORED] Results Display Section --- */}
         {isLoading ? (
           <div className="flex items-center justify-center min-h-[40vh]">
             <motion.div
@@ -307,7 +257,7 @@ export default function SearchPage() {
                 <h2 className="text-xl font-bold mb-4">{pageTitle}</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
                   {results.map((item) => (
-                    <MovieCard key={item.id} {...item} />
+                    <MovieCard key={`${item.id}-${item.category}`} {...item} />
                   ))}
                 </div>
               </>

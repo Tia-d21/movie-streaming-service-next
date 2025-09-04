@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { useState } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // This would connect to password reset service in a real app
-    console.log('Password reset requested for:', email);
+    console.log("Password reset requested for:", email);
     setSubmitted(true);
   };
 
@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
       </header>
 
       <main className="flex-grow flex items-center justify-center p-6">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -36,9 +36,10 @@ export default function ForgotPasswordPage() {
             <>
               <h1 className="text-3xl font-bold mb-4">Forgot Password</h1>
               <p className="text-zinc-400 mb-8">
-                We'll send you an email with instructions on how to reset your password.
+                We&apos;ll send you an email with instructions on how to reset
+                your password.
               </p>
-              
+
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <input
@@ -50,16 +51,19 @@ export default function ForgotPasswordPage() {
                     className="w-full p-4 rounded bg-zinc-800 text-white border border-zinc-700 focus:outline-none focus:border-zinc-500"
                   />
                 </div>
-                
-                <button 
-                  type="submit" 
+
+                <button
+                  type="submit"
                   className="w-full py-3 rounded bg-red-600 text-white font-medium hover:bg-red-700 transition duration-200"
                 >
                   Send Reset Link
                 </button>
-                
+
                 <div className="text-center">
-                  <Link href="/auth/login" className="text-zinc-400 hover:text-white hover:underline">
+                  <Link
+                    href="/auth/login"
+                    className="text-zinc-400 hover:text-white hover:underline"
+                  >
                     Back to Sign In
                   </Link>
                 </div>
@@ -73,8 +77,9 @@ export default function ForgotPasswordPage() {
             >
               <h1 className="text-3xl font-bold mb-4">Email Sent</h1>
               <p className="text-zinc-400 mb-8">
-                If an account exists with the email <span className="text-white">{email}</span>, 
-                you will receive password reset instructions.
+                If an account exists with the email{" "}
+                <span className="text-white">{email}</span>, you will receive
+                password reset instructions.
               </p>
               <Link href="/auth/login">
                 <button className="py-3 px-6 rounded bg-red-600 text-white font-medium hover:bg-red-700 transition duration-200">

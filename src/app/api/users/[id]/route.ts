@@ -1,15 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server'; 
-import { authMiddleware } from '@/middlewares/auth';
-import { prisma } from '@/lib/prisma';
-import bcrypt from 'bcryptjs';
+import { NextRequest, NextResponse } from "next/server";
+import { authMiddleware } from "middlewares/auth";
+import { prisma } from "lib/prisma";
+import bcrypt from "bcryptjs";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+// --- [FIX] Import Prisma types for stronger type safety ---
+import { Role, Prisma } from "@prisma/client";
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const user = await authMiddleware(req);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    if (user.role !== 'ADMIN' && user.userId !== params.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Admins can view any profile, users can only view their own.
+    if (user.role !== "ADMIN" && user.userId !== params.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const userData = await prisma.user.findUnique({
@@ -27,89 +35,140 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       },
     });
 
-    if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!userData)
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     return NextResponse.json(userData);
   } catch (error) {
-    console.error('Error fetching user:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error("Error fetching user:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const user = await authMiddleware(req);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    if (user.role !== 'ADMIN' && user.userId !== params.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Only admin or the user themselves can update (admin can update everything)
+    if (user.role !== "ADMIN" && user.userId !== params.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await req.json();
     const { name, email, password, role } = body;
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    const dataToUpdate: Prisma.UserUpdateInput = {};
 
-    if (email && !emailRegex.test(email)) {
-      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
-    }
-    if (password && !passwordRegex.test(password)) {
-      return NextResponse.json({
-        error: 'Password must be 8-20 chars, uppercase, lowercase, number & special char',
-      }, { status: 400 });
-    }
-
-    const dataToUpdate: any = {};
+    // Update name
     if (name) dataToUpdate.name = name;
-    if (email) dataToUpdate.email = email;
-    if (password) dataToUpdate.password = await bcrypt.hash(password, 10);
-    if (role && user.role === 'ADMIN') dataToUpdate.role = role;
 
+    // Update email with validation
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return NextResponse.json(
+          { error: "Invalid email format" },
+          { status: 400 }
+        );
+      }
+      dataToUpdate.email = email;
+    }
+
+    // Update password with hashing
+    if (password) {
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#]).{8,}$/;
+      if (!passwordRegex.test(password)) {
+        return NextResponse.json(
+          { error: "Password does not meet complexity requirements" },
+          { status: 400 }
+        );
+      }
+      dataToUpdate.password = await bcrypt.hash(password, 10);
+    }
+
+    // Update role only if the current user is admin
+    if (role && user.role === "ADMIN") {
+      const normalizedRole = role.toUpperCase();
+      if (Object.values(Role).includes(normalizedRole as Role)) {
+        dataToUpdate.role = normalizedRole as Role;
+      } else {
+        return NextResponse.json(
+          { error: "Invalid role specified" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Perform the update
     const updatedUser = await prisma.user.update({
       where: { id: params.id },
       data: dataToUpdate,
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+      },
     });
 
     return NextResponse.json(updatedUser);
-  } catch (error: any) {
-    console.error('Error updating user:', error);
-    if (error.code === 'P2002') return NextResponse.json({ error: 'Email already exists' }, { status: 409 });
-    if (error.code === 'P2025') return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  } catch (error: unknown) {
+    console.error("Error updating user:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+      }
+      if (error.code === "P2025") {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
+    }
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-export async function DELETE(req: NextRequest, context: { params: { id: string } }) {
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const params = await context.params;
-    const id = params.id;
-
     const user = await authMiddleware(req);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    
-    if (user.role !== 'ADMIN' && user.userId !== id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (user.role !== "ADMIN" && user.userId !== params.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-
-    await prisma.rating.deleteMany({ where: { userId: id } });
-    await prisma.favorite.deleteMany({ where: { userId: id } });
-    await prisma.myList.deleteMany({ where: { userId: id } });
-    await prisma.feedback.deleteMany({ where: { userId: id } });
 
     const deletedUser = await prisma.user.delete({
-      where: { id },
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
+      where: { id: params.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
     });
 
-    return NextResponse.json({ message: 'User deleted successfully', user: deletedUser });
-  } catch (error: any) {
-    console.error('Error deleting user:', error);
-    if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    return NextResponse.json({
+      message: "User and all associated data deleted successfully",
+      user: deletedUser,
+    });
+  } catch (error: unknown) {
+    console.error("Error deleting user:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -7,6 +7,7 @@ import { ArrowLeft, KeyRound, Eye, EyeOff } from "lucide-react";
 import Navbar from "../../../../app/components/layout/Navbar";
 import Footer from "../../../../app/components/layout/Footer";
 import { useUserProfile } from "../../../../app/hooks/useUserProfile";
+import { changePassword } from "../../../../lib/apiHelper";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -29,15 +30,9 @@ export default function ChangePasswordPage() {
   const [successMessage, setSuccessMessage] = useState("");
 
   const validate = () => {
-    const newErrors = {
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    };
+    const newErrors = { currentPassword: "", newPassword: "", confirmPassword: "" };
 
-    if (!currentPassword) {
-      newErrors.currentPassword = "Current password is required.";
-    }
+    if (!currentPassword) newErrors.currentPassword = "Current password is required.";
 
     const isPasswordValid =
       newPassword.length >= 8 &&
@@ -46,54 +41,59 @@ export default function ChangePasswordPage() {
       /[0-9]/.test(newPassword) &&
       /[!@#$%^&*]/.test(newPassword);
 
-    if (!newPassword) {
-      newErrors.newPassword = "New password is required.";
-    } else if (!isPasswordValid) {
+    if (!newPassword) newErrors.newPassword = "New password is required.";
+    else if (!isPasswordValid)
       newErrors.newPassword =
         "Must be 8+ characters and include uppercase, lowercase, a number, and a symbol (!@#$%^&*).";
-    }
 
-    if (!confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your new password.";
-    } else if (newPassword !== confirmPassword) {
+    if (!confirmPassword) newErrors.confirmPassword = "Please confirm your new password.";
+    else if (newPassword !== confirmPassword)
       newErrors.confirmPassword = "Passwords do not match.";
-    }
 
     return newErrors;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSuccessMessage("");
-
     const validationErrors = validate();
-    const hasErrors = Object.values(validationErrors).some(
-      (error) => error !== ""
-    );
+    const hasErrors = Object.values(validationErrors).some((err) => err !== "");
 
     if (hasErrors) {
       setErrors(validationErrors);
-    } else {
-      setErrors({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      console.log("Password change submitted for user:", user?.name);
+      return;
+    }
+
+    setErrors({ currentPassword: "", newPassword: "", confirmPassword: "" });
+
+    try {
+      if (!user?.id) throw new Error("User not found");
+
+      await changePassword({
+        userId: user.id,
+        currentPassword,
+        newPassword,
+      });
 
       setSuccessMessage("Your password has been changed successfully!");
-
-      setTimeout(() => {
-        router.push("/main/profile");
-      }, 3000);
+      setTimeout(() => router.push("/main/profile"), 2500);
+    } catch (err: any) {
+      console.error(err);
+      setErrors((prev) => ({
+        ...prev,
+        currentPassword: err.message || "Password change failed",
+      }));
     }
   };
 
   return (
     <main className="min-h-screen bg-black text-white">
       <Navbar />
-
       <div className="pt-24 pb-10 px-4 md:px-8 max-w-2xl mx-auto">
         <div className="mb-6">
           <button
             onClick={() => router.push("/main/profile")}
-            className="cursor-pointer flex items-center text-gray-400 hover:text-white transition-colors"
+            className="flex items-center text-gray-400 hover:text-white transition-colors"
           >
             <ArrowLeft className="mr-2" size={16} />
             <span>Back to Profile</span>
@@ -106,39 +106,32 @@ export default function ChangePasswordPage() {
           transition={{ duration: 0.5 }}
           className="bg-gray-900 rounded-lg p-8"
         >
-          <h1 className="text-3xl font-bold mb-8 text-center">
-            Change Password
-          </h1>
+          <h1 className="text-3xl font-bold mb-8 text-center">Change Password</h1>
 
           <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-            {/* --- THIS IS THE FIX --- */}
-            {/* The value of this hidden field is now set to the user's name */}
-            {/* instead of their email. This will make the browser's save */}
-            {/* password prompt show the name. */}
             <input
               type="hidden"
               name="username"
               autoComplete="username"
               value={user?.name || ""}
             />
-            {/* --- END OF FIX --- */}
 
-            {/* Current Password Field */}
+            {/* Current Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">
+              <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-400 mb-1">
                 Current Password
               </label>
               <div className="relative">
                 <input
+                  id="currentPassword"
                   type={showCurrent ? "text" : "password"}
                   autoComplete="current-password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   className={`w-full p-3 rounded bg-gray-800 text-white border focus:outline-none focus:ring-2 ${
-                    errors.currentPassword
-                      ? "border-red-500 ring-red-500"
-                      : "border-gray-700 focus:ring-red-500"
+                    errors.currentPassword ? "border-red-500 ring-red-500" : "border-gray-700 focus:ring-red-500"
                   }`}
+                  aria-invalid={errors.currentPassword ? "true" : "false"}
                   required
                 />
                 <button
@@ -149,29 +142,25 @@ export default function ChangePasswordPage() {
                   {showCurrent ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-              {errors.currentPassword && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.currentPassword}
-                </p>
-              )}
+              {errors.currentPassword && <p className="text-red-500 text-sm mt-1">{errors.currentPassword}</p>}
             </div>
 
-            {/* New Password Field */}
+            {/* New Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">
+              <label htmlFor="newPassword" className="block text-sm font-medium text-gray-400 mb-1">
                 New Password
               </label>
               <div className="relative">
                 <input
+                  id="newPassword"
                   type={showNew ? "text" : "password"}
                   autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className={`w-full p-3 rounded bg-gray-800 text-white border focus:outline-none focus:ring-2 ${
-                    errors.newPassword
-                      ? "border-red-500 ring-red-500"
-                      : "border-gray-700 focus:ring-red-500"
+                    errors.newPassword ? "border-red-500 ring-red-500" : "border-gray-700 focus:ring-red-500"
                   }`}
+                  aria-invalid={errors.newPassword ? "true" : "false"}
                   required
                 />
                 <button
@@ -182,29 +171,25 @@ export default function ChangePasswordPage() {
                   {showNew ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-              {errors.newPassword && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.newPassword}
-                </p>
-              )}
+              {errors.newPassword && <p className="text-red-500 text-sm mt-1">{errors.newPassword}</p>}
             </div>
 
-            {/* Confirm New Password Field */}
+            {/* Confirm Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-400 mb-1">
                 Confirm New Password
               </label>
               <div className="relative">
                 <input
+                  id="confirmPassword"
                   type={showConfirm ? "text" : "password"}
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className={`w-full p-3 rounded bg-gray-800 text-white border focus:outline-none focus:ring-2 ${
-                    errors.confirmPassword
-                      ? "border-red-500 ring-red-500"
-                      : "border-gray-700 focus:ring-red-500"
+                    errors.confirmPassword ? "border-red-500 ring-red-500" : "border-gray-700 focus:ring-red-500"
                   }`}
+                  aria-invalid={errors.confirmPassword ? "true" : "false"}
                   required
                 />
                 <button
@@ -215,22 +200,16 @@ export default function ChangePasswordPage() {
                   {showConfirm ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-              {errors.confirmPassword && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.confirmPassword}
-                </p>
-              )}
+              {errors.confirmPassword && <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>}
             </div>
 
             {successMessage && (
-              <p className="text-green-400 text-sm text-center bg-green-900/50 p-3 rounded-md">
-                {successMessage}
-              </p>
+              <p className="text-green-400 text-sm text-center bg-green-900/50 p-3 rounded-md">{successMessage}</p>
             )}
 
             <button
               type="submit"
-              className="cursor-pointer w-full py-3 rounded bg-red-600 text-white font-medium hover:bg-red-700 transition duration-200 flex items-center justify-center"
+              className="w-full py-3 rounded bg-red-600 text-white font-medium hover:bg-red-700 transition duration-200 flex items-center justify-center"
             >
               <KeyRound className="mr-2" size={18} />
               Update Password
