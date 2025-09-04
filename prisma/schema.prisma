@@ -8,17 +8,46 @@ datasource db {
 }
 
 model User {
-  id             String         @id @default(uuid())
-  name           String
-  email          String         @unique
-  password       String
-  createdAt      DateTime       @default(now())
-  role           Role           @default(USER)
-  favorites      Favorite[]
-  feedbacks      Feedback[]
-  mylist         MyList[]
-  ratings        Rating[]
-  watchHistories WatchHistory[]
+  id           String         @id @default(uuid())
+  name         String
+  email        String         @unique
+  password     String
+  createdAt    DateTime       @default(now())
+  role         Role           @default(USER)
+  favorites    Favorite[]
+  feedbacks    Feedback[]
+  mylist       MyList[]
+  ratings      Rating[]
+  watchHistory WatchHistory[]
+}
+
+model Movie {
+  id           Int            @id
+  title        String
+  description  String
+  genre        String
+  year         Int
+  url          String
+  createdAt    DateTime       @default(now())
+  rating       Float?
+  releaseDate  DateTime?
+  posterPath   String?
+  favorites    Favorite[]
+  feedbacks    Feedback[]
+  mylist       MyList[]
+  ratings      Rating[]
+  watchHistory WatchHistory[]
+}
+
+model WatchHistory {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  movieId   Int
+  watchedAt DateTime @default(now())
+  movie     Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
 }
 
 model Favorite {
@@ -26,7 +55,8 @@ model Favorite {
   userId    String
   movieId   Int
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
+  movie     Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, movieId])
 }
@@ -37,7 +67,8 @@ model MyList {
   movieId   Int
   status    MyListStatus @default(TOWATCH)
   createdAt DateTime     @default(now())
-  user      User         @relation(fields: [userId], references: [id])
+  movie     Movie        @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, movieId])
 }
@@ -48,7 +79,8 @@ model Rating {
   movieId   Int
   value     Int
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
+  movie     Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, movieId])
 }
@@ -67,7 +99,8 @@ model Feedback {
   movieId   Int?
   message   String
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
+  movie     Movie?   @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum MyListStatus {

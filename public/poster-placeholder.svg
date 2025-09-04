@@ -1,0 +1,6 @@
+<svg width="500" height="750" viewBox="0 0 500 750" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="500" height="750" fill="#1A1A1A"/>
+  <rect x="100" y="275" width="300" height="200" rx="10" fill="#333333"/>
+  <text x="250" y="350" font-family="Arial" font-size="36" text-anchor="middle" fill="#E50914">Netflix</text>
+  <text x="250" y="400" font-family="Arial" font-size="20" text-anchor="middle" fill="#FFFFFF">Poster Placeholder</text>
+</svg>

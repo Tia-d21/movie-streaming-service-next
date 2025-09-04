@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth } from '@/middlewares/adminAuth';
-import { prisma } from '@/lib/prisma';
+import { adminAuth } from 'middlewares/adminAuth';
+import { prisma } from 'lib/prisma';
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,11 +19,8 @@ export async function GET(req: NextRequest) {
       totalRatings,
       totalFeedbacks,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching admin dashboard:', error);
-    return NextResponse.json(
-      { error: error.message || 'Unauthorized' },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unauthorized' }, { status: 401 });
   }
 }
