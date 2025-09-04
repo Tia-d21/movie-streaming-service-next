@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST add feedback
+// POST feedback
 export async function POST(req: NextRequest) {
   try {
     const user = await authMiddleware(req);
@@ -40,11 +40,13 @@ export async function POST(req: NextRequest) {
       );
 
     const feedback = await prisma.feedback.create({
-      data: { userId: user.userId, movieId, message },
+      data: {
+        userId: user.userId,
+        movieId: movieId || null,
+        message,
+      },
+      include: { movie: true },
     });
-
-    let movie = null;
-    if (movieId) movie = await fetchMovieDetails(movieId);
 
     return NextResponse.json(feedback, { status: 201 });
   } catch (error) {
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// DELETE remove feedback
+// DELETE feedback
 export async function DELETE(req: NextRequest) {
   try {
     const user = await authMiddleware(req);
@@ -70,13 +72,9 @@ export async function DELETE(req: NextRequest) {
         { status: 400 }
       );
 
-    const deleted = await prisma.feedback.deleteMany({
-      where: { id: feedbackId, userId: user.userId },
+    await prisma.feedback.delete({
+      where: { id },
     });
-
-    if (deleted.count === 0) {
-      return NextResponse.json({ error: 'Feedback not found' }, { status: 404 });
-    }
 
     return NextResponse.json({ message: "Feedback deleted successfully" });
   } catch (error: unknown) {
