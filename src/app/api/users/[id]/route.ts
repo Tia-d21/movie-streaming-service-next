@@ -9,7 +9,7 @@ import { Role, Prisma } from "@prisma/client";
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
-) {
+) {  
   try {
     const user = await authMiddleware(req);
     if (!user)
@@ -51,8 +51,7 @@ export async function GET(
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
-) {
-  try {
+) {     try {
     const user = await authMiddleware(req);
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -139,8 +138,7 @@ export async function PUT(
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
-) {
-  try {
+) {     try {
     const user = await authMiddleware(req);
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
