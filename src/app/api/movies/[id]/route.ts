@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth } from "middlewares/adminAuth";
-import { prisma } from "lib/prisma";
+import { adminAuth } from "@/middlewares/adminAuth";
+import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 

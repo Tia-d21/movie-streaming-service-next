@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authMiddleware } from "middlewares/auth";
-import { prisma } from "lib/prisma";
-import { movieUpsert } from "lib/movieUpsert"; // Import our helper
+import { authMiddleware } from "@/middlewares/auth";
+import { prisma } from "@/lib/prisma";
+import { movieUpsert } from "@/lib/movieUpsert"; // Import our helper
 
 // GET all ratings of logged-in user
 export async function GET(req: NextRequest) {

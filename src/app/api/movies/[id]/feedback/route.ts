@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 // GETs all feedback (comments) for a specific movie ID.
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {

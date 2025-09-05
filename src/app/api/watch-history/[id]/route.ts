@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authMiddleware } from 'middlewares/auth';
-import { prisma } from 'lib/prisma';
+import { authMiddleware } from '@/middlewares/auth';
+import { prisma } from '@/lib/prisma';
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';

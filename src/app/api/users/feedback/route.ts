@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authMiddleware } from "middlewares/auth";
-import { prisma } from "lib/prisma";
+import { authMiddleware } from "@/middlewares/auth";
+import { prisma } from "@/lib/prisma";
 
 // GET all feedbacks of logged-in user
 export async function GET(req: NextRequest) {
