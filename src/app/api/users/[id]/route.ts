@@ -3,7 +3,6 @@ import { authMiddleware } from "middlewares/auth";
 import { prisma } from "lib/prisma";
 import bcrypt from "bcryptjs";
 
-// --- [FIX] Import Prisma types for stronger type safety ---
 import { Role, Prisma } from "@prisma/client";
 
 export async function GET(
