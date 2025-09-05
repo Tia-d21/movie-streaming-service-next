@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authMiddleware } from "middlewares/auth";
-import { prisma } from "lib/prisma";
+import { authMiddleware } from "@/middlewares/auth";
+import { prisma } from "@/lib/prisma";
 
 // GETs the current user's rating for a specific movie.
 export async function GET(req: NextRequest, { params }: { params: { movieId: string } }) {

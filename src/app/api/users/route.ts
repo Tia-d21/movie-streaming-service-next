@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { prisma } from "lib/prisma";
-import { adminAuth } from "middlewares/adminAuth";
+import { prisma } from "@/lib/prisma";
+import { adminAuth } from "@/middlewares/adminAuth";
 import { Role, Prisma } from "@prisma/client";
 
 // --- GET: fetch all users ---

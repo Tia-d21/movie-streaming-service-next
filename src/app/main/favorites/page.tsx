@@ -6,7 +6,7 @@ import Footer from "../../../app/components/layout/Footer";
 import MovieCard from "../../../app/components/ui/MovieCard";
 import { useFavorites } from "../../../app/hooks/useFavorites"; // Import the new hook
 import Link from "next/link";
-
+export const dynamic = 'force-dynamic'; 
 export default function FavoritesPage() {
   const { favorites, isLoading } = useFavorites();
 

@@ -30,6 +30,8 @@ const GENRE_CATEGORIES_TO_DISPLAY: string[] = [
   "Thriller",
 ];
 
+// REMOVE THIS LINE: export const dynamic = 'force-dynamic';
+
 export default function BrowsePage() {
   const [featuredItem, setFeaturedItem] = useState<MediaItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,8 +39,12 @@ export default function BrowsePage() {
   const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
   const [heroBannerPool, setHeroBannerPool] = useState<MediaItem[]>([]);
 
+  // This will cause the error - useSearchParams() in client component without Suspense
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get("category");
+
+  // ... rest of your component code remains the same
+
 
   useEffect(() => {
     const loadAllData = async () => {

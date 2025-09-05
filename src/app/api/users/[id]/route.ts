@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authMiddleware } from "middlewares/auth";
-import { prisma } from "lib/prisma";
+import { authMiddleware } from "@/middlewares/auth";
+import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-
-// --- [FIX] Import Prisma types for stronger type safety ---
 import { Role, Prisma } from "@prisma/client";
 
 export async function GET(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
-) {  
+) {
   try {
-    const user = await authMiddleware(req);
+    const user = await authMiddleware(request);
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -48,11 +46,12 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  req: NextRequest,
+export async function POST(
+  request: NextRequest,
   { params }: { params: { id: string } }
-) {     try {
-    const user = await authMiddleware(req);
+) {
+  try {
+    const user = await authMiddleware(request);
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -61,7 +60,7 @@ export async function PUT(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const body = await req.json();
+    const body = await request.json();
     const { name, email, password, role } = body;
 
     const dataToUpdate: Prisma.UserUpdateInput = {};
@@ -134,12 +133,12 @@ export async function PUT(
   }
 }
 
-
 export async function DELETE(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
-) {     try {
-    const user = await authMiddleware(req);
+) {
+  try {
+    const user = await authMiddleware(request);
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

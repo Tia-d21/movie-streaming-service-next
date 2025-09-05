@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
-import { prisma } from "lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 // Use the secret from your .env.local file
 const JWT_SECRET = process.env.JWT_SECRET;
