@@ -1,6 +1,3 @@
-VIDEO:https://github.com/user-attachments/assets/81260a6e-ff61-47e4-96ac-e6cc890236de
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-
 🎬 Movie Streaming Service
 
 Welcome to our Movie Streaming Service, a full-stack web application built to provide users with a smooth Netflix-like experience — but tailored for learning, exploration, and creativity.
