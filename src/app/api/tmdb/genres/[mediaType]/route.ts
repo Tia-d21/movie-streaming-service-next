@@ -3,9 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 const API_KEY = process.env.TMDB_API_KEY;
 const BASE_URL = "https://api.themoviedb.org/3";
 
-export async function GET(req: NextRequest, { params }: { params: { mediaType: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ mediaType: string }> }) {
+  const { mediaType } = await params;
+  // Now use the `mediaType` variable in your code 
   try {
-    const { mediaType } = params;
+    //const { mediaType } = params;
 
     if (!API_KEY) {
       console.error("TMDB_API_KEY is not set in .env.local");

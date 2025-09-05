@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "middlewares/adminAuth";
 import { prisma } from "lib/prisma";
-import { Prisma } from "@prisma/client"; // --- [FIX] Import Prisma's types
+import { Prisma } from "@prisma/client";
 
 // GET movie by id
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  
   try {
-    const movieId = Number(params.id);
+    const movieId = Number(id);
+    
     if (isNaN(movieId)) {
       return NextResponse.json({ error: "Invalid movie ID" }, { status: 400 });
     }
@@ -41,13 +41,13 @@ export async function GET(
 // PUT update movie (admin only)
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // A more streamlined way to handle auth
+    const { id } = await params;
     await adminAuth(req);
 
-    const movieId = Number(params.id);
+    const movieId = Number(id);
     if (isNaN(movieId)) {
       return NextResponse.json({ error: "Invalid movie ID" }, { status: 400 });
     }
@@ -55,7 +55,6 @@ export async function PUT(
     const body = await req.json();
     const { categoryId, title, description, genre, year, url, rating } = body;
 
-    // --- [FIX] Use Prisma's generated type for the update payload ---
     const dataToUpdate: Prisma.MovieUpdateInput = {};
 
     if (title) dataToUpdate.title = title;
@@ -65,7 +64,6 @@ export async function PUT(
     if (url) dataToUpdate.url = url;
     if (rating !== undefined) dataToUpdate.rating = rating;
 
-    // --- [FIX] Validate categoryId and ensure it's a string ---
     if (categoryId) {
       if (typeof categoryId !== "string") {
         return NextResponse.json(
@@ -82,7 +80,6 @@ export async function PUT(
           { status: 400 }
         );
       }
-      // Connect to the category relation
       dataToUpdate.category = {
         connect: { id: categoryId },
       };
@@ -108,7 +105,6 @@ export async function PUT(
         return NextResponse.json({ error: "Movie not found" }, { status: 404 });
       }
     }
-    // Handle auth errors which might be thrown from adminAuth
     if (error instanceof Error && error.message.includes("Unauthorized")) {
       return NextResponse.json({ error: error.message }, { status: 401 });
     }
@@ -122,19 +118,20 @@ export async function PUT(
 // DELETE movie (admin only)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await adminAuth(req);
 
-    const movieId = Number(params.id);
+    const movieId = Number(id);
     if (isNaN(movieId)) {
       return NextResponse.json({ error: "Invalid movie ID" }, { status: 400 });
     }
 
     await prisma.movie.delete({ where: { id: movieId } });
 
-    return new NextResponse(null, { status: 204 }); // Return 204 No Content for successful deletions
+    return new NextResponse(null, { status: 204 });
   } catch (error: unknown) {
     console.error("Error deleting movie:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {

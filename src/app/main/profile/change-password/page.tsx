@@ -77,11 +77,11 @@ export default function ChangePasswordPage() {
 
       setSuccessMessage("Your password has been changed successfully!");
       setTimeout(() => router.push("/main/profile"), 2500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setErrors((prev) => ({
         ...prev,
-        currentPassword: err.message || "Password change failed",
+        currentPassword: err instanceof Error ? err.message : "Password change failed",
       }));
     }
   };

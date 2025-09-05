@@ -5,9 +5,11 @@ const BASE_URL = "https://api.themoviedb.org/3";
 
 // This endpoint gets details for a specific movie or TV show.
 // Example usage: /api/tmdb/details/movie/123
-export async function GET(req: NextRequest, { params }: { params: { slug: string[] } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ slug: string[] }> }) {
+  const { slug } = await params;
+  // Now use the `slug` array in your codetry 
   try {
-    const [category, id] = params.slug;
+    const [category, id] = slug;
 
     if (!category || !id || (category !== 'movie' && category !== 'tv')) {
       return NextResponse.json({ error: "Invalid category or ID provided" }, { status: 400 });
