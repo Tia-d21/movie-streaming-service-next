@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -22,13 +22,16 @@ import { useMyList } from "../../../app/hooks/useMyList";
 import { useFavorites } from "../../../app/hooks/useFavorites";
 import { useUserProfile } from "../../../app/hooks/useUserProfile";
 import { useAuthModal } from "../../../app/hooks/useAuthModal";
+import { fetchWithAuth } from "../../../lib/apiHelper";
 
 interface Comment {
-  id: number;
-  user: string;
-  userEmail: string; // Using email as the temporary unique identifier
-  text: string;
-  timestamp: string;
+  id: string;
+  userId: string;
+  message: string;
+  createdAt: string;
+  user: {
+    name: string;
+  };
 }
 
 export default function MovieDetails() {
@@ -47,19 +50,59 @@ export default function MovieDetails() {
   const { addToMyList, removeFromMyList, isInMyList } = useMyList();
   const { toggleFavorite, isFavorite } = useFavorites();
 
+  // --- [NEW] Function to fetch all comments for the movie ---
+  const fetchMovieComments = useCallback(async (movieId: string) => {
+    try {
+      // This is a public endpoint, so no need for fetchWithAuth
+      const response = await fetch(`/api/movies/${movieId}/feedback`);
+      if (response.ok) {
+        const data = await response.json();
+        setComments(data);
+      }
+    } catch (error) {
+      console.error("Could not fetch comments", error);
+    }
+  }, []);
+
+  // --- [NEW] Function to fetch the logged-in user's rating for this movie ---
+  const fetchUserRating = useCallback(
+    async (movieId: string) => {
+      // Only try to fetch a rating if the user is logged in.
+      if (!user) return;
+      try {
+        const data = await fetchWithAuth(`/api/users/rating/${movieId}`);
+        if (data && data.value) {
+          setCurrentUserRating(data.value);
+        }
+      } catch (error) {
+        // A 404 or null response is expected if no rating exists, so we can ignore the error.
+        console.log("No existing rating found for this user.");
+      }
+    },
+    [user]
+  );
+
   useEffect(() => {
     const loadDetails = async () => {
       setIsLoading(true);
       const category = params.category as "movie" | "tv";
       const id = params.id as string;
       if (category && id) {
+        // Fetch public movie data from TMDB proxy
         const foundItem = await fetchMediaDetails(id, category);
         setItem(foundItem);
+
+        // --- [NEW] After loading the movie, fetch its comments and the user's rating ---
+        await fetchMovieComments(id);
+        await fetchUserRating(id);
       }
       setIsLoading(false);
     };
     loadDetails();
-  }, [params.id, params.category]);
+  }, [params.id, params.category, fetchMovieComments, fetchUserRating]);
+
+  // All handler functions (handlePlay, handleCommentSubmit, etc.) remain unchanged.
+  // ... (rest of the handler functions) ...
 
   const handleGoBack = () => router.back();
 
@@ -87,39 +130,83 @@ export default function MovieDetails() {
     toggleFavorite(item);
   };
 
-  const handleRatingSubmit = (rating: number) => {
-    if (!user) {
+  const handleRatingSubmit = async (rating: number) => {
+    if (!user || !item) {
       openModal();
       return;
     }
-    setCurrentUserRating(rating);
-    setShowRatingWidget(false);
+    try {
+      await fetchWithAuth("/api/users/rating", {
+        method: "POST",
+        body: JSON.stringify({ movieData: item, value: rating }),
+      });
+      setCurrentUserRating(rating);
+      setShowRatingWidget(false);
+    } catch (error) {
+      console.error("Failed to submit rating:", error);
+      alert("Could not save your rating. Please try again.");
+    }
+  };
+  const handleDeleteRating = async () => {
+    if (!user || !item) return;
+
+    if (window.confirm("Are you sure you want to remove your rating?")) {
+      try {
+        await fetchWithAuth("/api/users/rating", {
+          method: "DELETE",
+          body: JSON.stringify({ movieId: item.id }),
+        });
+        // Reset the rating state on the frontend
+        setCurrentUserRating(0);
+        setShowRatingWidget(false); // Hide the widget if it was open
+      } catch (error) {
+        console.error("Failed to delete rating:", error);
+        alert("Could not remove your rating. Please try again.");
+      }
+    }
   };
 
-  const handleCommentSubmit = (e: React.FormEvent) => {
+  const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) {
+    if (!user || !item || !currentComment.trim()) {
       openModal();
       return;
     }
-    if (currentComment.trim()) {
-      const newComment: Comment = {
-        id: Date.now(),
-        user: user.name || "Logged-in User",
-        userEmail: user.email,
-        text: currentComment,
-        timestamp: new Date().toISOString(),
-      };
-      setComments([newComment, ...comments]);
+
+    try {
+      const newComment = await fetchWithAuth("/api/users/feedback", {
+        method: "POST",
+        body: JSON.stringify({
+          movieId: parseInt(item.id, 10),
+          message: currentComment,
+        }),
+      });
+      // Add the new comment to the state to update UI instantly
+      setComments((prev) => [
+        { ...newComment, user: { name: user.name } },
+        ...prev,
+      ]);
       setCurrentComment("");
+    } catch (error) {
+      console.error("Failed to post comment:", error);
+      alert("Failed to post your comment. Please try again.");
     }
   };
 
-  const handleDeleteComment = (commentIdToDelete: number) => {
+  const handleDeleteComment = async (commentIdToDelete: string) => {
     if (window.confirm("Are you sure you want to delete this comment?")) {
-      setComments((prevComments) =>
-        prevComments.filter((comment) => comment.id !== commentIdToDelete)
-      );
+      try {
+        await fetchWithAuth("/api/users/feedback", {
+          method: "DELETE",
+          body: JSON.stringify({ id: commentIdToDelete }),
+        });
+        setComments((prevComments) =>
+          prevComments.filter((comment) => comment.id !== commentIdToDelete)
+        );
+      } catch (error) {
+        console.error("Failed to delete comment:", error);
+        alert("Could not delete the comment. Please try again.");
+      }
     }
   };
 
@@ -144,9 +231,6 @@ export default function MovieDetails() {
         <Navbar />
         <div className="flex flex-col items-center justify-center min-h-screen">
           <h1 className="text-3xl font-bold mb-4">Content Not Found</h1>
-          <p className="text-gray-400 mb-6">
-            The requested movie or show could not be found.
-          </p>
           <button
             onClick={handleGoBack}
             className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md transition-colors"
@@ -165,7 +249,7 @@ export default function MovieDetails() {
     <div className="min-h-screen bg-black text-white">
       <Navbar />
 
-      {/* --- TOP HERO SECTION --- */}
+      {/* --- [RESTORED] TOP HERO SECTION --- */}
       <div className="relative w-full h-[80vh] overflow-hidden">
         <div className="absolute inset-0">
           <Image
@@ -200,15 +284,13 @@ export default function MovieDetails() {
               <span>{item.releaseYear}</span>
               {item.duration && (
                 <>
-                  {" "}
-                  <span className="mx-2">•</span> <span>{item.duration}</span>{" "}
+                  <span className="mx-2">•</span> <span>{item.duration}</span>
                 </>
               )}
               {item.seasons && (
                 <>
-                  {" "}
-                  <span className="mx-2">•</span>{" "}
-                  <span>{item.seasons} Seasons</span>{" "}
+                  <span className="mx-2">•</span>
+                  <span>{item.seasons} Seasons</span>
                 </>
               )}
             </div>
@@ -269,6 +351,7 @@ export default function MovieDetails() {
                   ? `You rated this ${currentUserRating} ★`
                   : "Rate this movie"}
               </button>
+
               {showRatingWidget && user && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -292,6 +375,21 @@ export default function MovieDetails() {
                       />
                     </motion.div>
                   ))}
+
+                  {/* The new Delete button appears here when a rating exists */}
+                  {currentUserRating > 0 && (
+                    <motion.div
+                      whileHover={{ scale: 1.2 }}
+                      whileTap={{ scale: 0.9 }}
+                      className="ml-2 border-l border-gray-600 pl-2"
+                    >
+                      <Trash2
+                        size={22}
+                        className="cursor-pointer text-gray-500 hover:text-red-500 transition-colors"
+                        onClick={handleDeleteRating}
+                      />
+                    </motion.div>
+                  )}
                 </motion.div>
               )}
             </div>
@@ -299,9 +397,9 @@ export default function MovieDetails() {
         </div>
       </div>
 
-      {/* --- MAIN CONTENT AREA --- */}
+      {/* --- [RESTORED] MAIN CONTENT AREA --- */}
       <div className="container mx-auto px-4 md:px-8 py-12">
-        {/* --- CAST & CREW SECTION (RESTORED) --- */}
+        {/* --- CAST & CREW SECTION --- */}
         {item.cast && item.cast.length > 0 && (
           <>
             <h2 className="text-2xl font-bold mb-6">Cast & Crew</h2>
@@ -334,7 +432,7 @@ export default function MovieDetails() {
           </>
         )}
 
-        {/* --- MORE LIKE THIS SECTION (RESTORED) --- */}
+        {/* --- MORE LIKE THIS SECTION --- */}
         {item.similar && item.similar.length > 0 && (
           <div className="mt-16">
             <h2 className="text-2xl font-bold mb-6">More Like This</h2>
@@ -395,11 +493,11 @@ export default function MovieDetails() {
                   className="bg-gray-900/50 p-4 rounded-lg border border-gray-800"
                 >
                   <div className="flex items-center mb-2">
-                    <p className="font-bold text-white">{comment.user}</p>
+                    <p className="font-bold text-white">{comment.user.name}</p>
                     <p className="text-gray-400 text-xs ml-auto">
-                      {new Date(comment.timestamp).toLocaleString()}
+                      {new Date(comment.createdAt).toLocaleString()}
                     </p>
-                    {user && user.email === comment.userEmail && (
+                    {user && user.id === comment.userId && (
                       <button
                         onClick={() => handleDeleteComment(comment.id)}
                         className="ml-4 text-gray-400 hover:text-red-500 transition-colors"
@@ -410,7 +508,7 @@ export default function MovieDetails() {
                     )}
                   </div>
                   <p className="text-gray-300 whitespace-pre-wrap">
-                    {comment.text}
+                    {comment.message}
                   </p>
                 </motion.div>
               ))

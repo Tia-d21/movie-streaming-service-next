@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, KeyRound, Eye, EyeOff } from "lucide-react";
 import Navbar from "../../../../app/components/layout/Navbar";
 import Footer from "../../../../app/components/layout/Footer";
 import { useUserProfile } from "../../../../app/hooks/useUserProfile";
+// --- [NEW] Import our authenticated fetch helper ---
+import { fetchWithAuth } from "../../../../lib/apiHelper";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -21,24 +23,16 @@ export default function ChangePasswordPage() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const [errors, setErrors] = useState({
-    currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
-
   const [successMessage, setSuccessMessage] = useState("");
+  // --- [NEW] State for API errors and loading ---
+  const [apiError, setApiError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const validate = () => {
-    const newErrors = {
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    };
-
-    if (!currentPassword) {
-      newErrors.currentPassword = "Current password is required.";
-    }
-
+    const newErrors = { newPassword: "", confirmPassword: "" };
     const isPasswordValid =
       newPassword.length >= 8 &&
       /[A-Z]/.test(newPassword) &&
@@ -53,35 +47,55 @@ export default function ChangePasswordPage() {
         "Must be 8+ characters and include uppercase, lowercase, a number, and a symbol (!@#$%^&*).";
     }
 
-    if (!confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your new password.";
-    } else if (newPassword !== confirmPassword) {
+    if (newPassword !== confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match.";
     }
-
     return newErrors;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // --- [MODIFIED] This function is now async and calls the backend ---
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSuccessMessage("");
+    setApiError("");
+    setErrors({ newPassword: "", confirmPassword: "" });
 
     const validationErrors = validate();
-    const hasErrors = Object.values(validationErrors).some(
-      (error) => error !== ""
-    );
-
-    if (hasErrors) {
+    if (validationErrors.newPassword || validationErrors.confirmPassword) {
       setErrors(validationErrors);
-    } else {
-      setErrors({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      console.log("Password change submitted for user:", user?.name);
+      return;
+    }
 
+    if (!user) {
+      setApiError("You must be logged in to change your password.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Call the PUT endpoint for the specific user
+      await fetchWithAuth(`/api/users/${user.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          password: newPassword, // The backend only needs the new password
+        }),
+      });
+
+      // Only set success message after the API call succeeds
       setSuccessMessage("Your password has been changed successfully!");
 
+      // Clear fields and redirect
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
       setTimeout(() => {
         router.push("/main/profile");
-      }, 3000);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to change password:", error);
+      setApiError((error as Error).message || "An unexpected error occurred.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -111,19 +125,14 @@ export default function ChangePasswordPage() {
           </h1>
 
           <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-            {/* --- THIS IS THE FIX --- */}
-            {/* The value of this hidden field is now set to the user's name */}
-            {/* instead of their email. This will make the browser's save */}
-            {/* password prompt show the name. */}
             <input
               type="hidden"
               name="username"
               autoComplete="username"
               value={user?.name || ""}
             />
-            {/* --- END OF FIX --- */}
 
-            {/* Current Password Field */}
+            {/* Current Password Field (Note: not used by backend but good for UI) */}
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">
                 Current Password
@@ -134,11 +143,7 @@ export default function ChangePasswordPage() {
                   autoComplete="current-password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className={`w-full p-3 rounded bg-gray-800 text-white border focus:outline-none focus:ring-2 ${
-                    errors.currentPassword
-                      ? "border-red-500 ring-red-500"
-                      : "border-gray-700 focus:ring-red-500"
-                  }`}
+                  className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500"
                   required
                 />
                 <button
@@ -149,11 +154,6 @@ export default function ChangePasswordPage() {
                   {showCurrent ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-              {errors.currentPassword && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.currentPassword}
-                </p>
-              )}
             </div>
 
             {/* New Password Field */}
@@ -222,6 +222,12 @@ export default function ChangePasswordPage() {
               )}
             </div>
 
+            {/* --- [NEW] Display API errors or success messages --- */}
+            {apiError && (
+              <p className="text-red-500 text-sm text-center bg-red-900/50 p-3 rounded-md">
+                {apiError}
+              </p>
+            )}
             {successMessage && (
               <p className="text-green-400 text-sm text-center bg-green-900/50 p-3 rounded-md">
                 {successMessage}
@@ -230,15 +236,15 @@ export default function ChangePasswordPage() {
 
             <button
               type="submit"
-              className="cursor-pointer w-full py-3 rounded bg-red-600 text-white font-medium hover:bg-red-700 transition duration-200 flex items-center justify-center"
+              disabled={isLoading}
+              className="cursor-pointer w-full py-3 rounded bg-red-600 text-white font-medium hover:bg-red-700 transition duration-200 flex items-center justify-center disabled:bg-red-900 disabled:cursor-not-allowed"
             >
               <KeyRound className="mr-2" size={18} />
-              Update Password
+              {isLoading ? "Updating..." : "Update Password"}
             </button>
           </form>
         </motion.div>
       </div>
-
       <Footer />
     </main>
   );

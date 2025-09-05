@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth } from '@/middlewares/adminAuth';
-import { prisma } from '@/lib/prisma';
+import { NextRequest, NextResponse } from "next/server";
+import { adminAuth } from "middlewares/adminAuth";
+import { prisma } from "lib/prisma";
 
 // GET all movies
 export async function GET(req: NextRequest) {
   try {
     const movies = await prisma.movie.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         category: { select: { id: true, name: true } },
         favorites: { include: { user: { select: { id: true, name: true } } } },
@@ -17,17 +17,25 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json(movies);
-  } catch (error: any) {
-    console.error('Error fetching movies:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error: unknown) {
+    console.error("Error fetching movies:", error);
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
+      { status: 500 }
+    );
   }
 }
 
 // POST create new movie (admin only)
 export async function POST(req: NextRequest) {
   try {
-    const admin = await adminAuth(req).catch((err: any) =>
-      NextResponse.json({ error: err.message || 'Unauthorized' }, { status: 401 })
+    const admin = await adminAuth(req).catch((err: Error) =>
+      NextResponse.json(
+        { error: err.message || "Unauthorized" },
+        { status: 401 }
+      )
     );
     if ((admin as NextResponse)?.status === 401) return admin as NextResponse;
 
@@ -35,13 +43,22 @@ export async function POST(req: NextRequest) {
     const { title, description, genre, year, url, categoryId, rating } = body;
 
     if (!title || !description || !year || !url) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
     let validCategoryId: string | null = null;
     if (categoryId) {
-      const category = await prisma.category.findUnique({ where: { id: categoryId } });
-      if (!category) return NextResponse.json({ error: 'Invalid category ID' }, { status: 400 });
+      const category = await prisma.category.findUnique({
+        where: { id: categoryId },
+      });
+      if (!category)
+        return NextResponse.json(
+          { error: "Invalid category ID" },
+          { status: 400 }
+        );
       validCategoryId = categoryId;
     }
 
@@ -49,7 +66,7 @@ export async function POST(req: NextRequest) {
       data: {
         title,
         description,
-        genre: genre || 'Unknown',
+        genre: genre || "Unknown",
         year,
         url,
         rating: rating || null,
@@ -65,8 +82,13 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(movie, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating movie:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error: unknown) {
+    console.error("Error creating movie:", error);
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
+      { status: 500 }
+    );
   }
 }

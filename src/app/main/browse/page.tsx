@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import HeroBanner from "../../../app/components/ui/HeroBanner";
@@ -8,25 +8,26 @@ import Carousel, { CategoryType } from "../../../app/components/ui/Carousel";
 import Navbar from "../../../app/components/layout/Navbar";
 import Footer from "../../../app/components/layout/Footer";
 import { MediaItem } from "../../../app/data/mockData";
-import {
-  fetchTrendingByPage,
-  fetchPopularMoviesByPage,
-  fetchTopRatedShowsByPage,
-  fetchUpcomingMoviesByPage,
-  getGenreList,
-  fetchMediaByGenreByPage,
-} from "../../../app/services/tmdb";
+import * as tmdbApi from "../../../app/services/tmdb";
 
 interface Category {
-  id: string; // e.g., "trending", "popular-movies", "genre-28"
+  id: string;
   title: string;
   items: MediaItem[];
   genreId?: number;
-  mediaType?: 'movie' | 'tv';
+  mediaType?: "movie" | "tv";
 }
 
 const GENRE_CATEGORIES_TO_DISPLAY: string[] = [
-  "Action", "Adventure", "Comedy", "Drama", "Horror", "Romance", "Science Fiction", "Fantasy", "Thriller",
+  "Action",
+  "Adventure",
+  "Comedy",
+  "Drama",
+  "Horror",
+  "Romance",
+  "Science Fiction",
+  "Fantasy",
+  "Thriller",
 ];
 
 export default function BrowsePage() {
@@ -44,82 +45,138 @@ export default function BrowsePage() {
       setIsLoading(true);
 
       const initialPromises = [
-        fetchTrendingByPage(1),
-        fetchPopularMoviesByPage(1),
-        fetchTopRatedShowsByPage(1),
-        fetchUpcomingMoviesByPage(1),
+        tmdbApi.fetchTrendingByPage(1),
+        tmdbApi.fetchPopularMoviesByPage(1),
+        tmdbApi.fetchTopRatedShowsByPage(1),
+        tmdbApi.fetchUpcomingMoviesByPage(1),
       ];
-      
-      const [movieGenres] = await Promise.all([ getGenreList('movie') ]);
-      const genreMap = new Map<string, number>();
-      movieGenres.forEach(genre => genreMap.set(genre.name, genre.id));
 
-      const genrePromises = GENRE_CATEGORIES_TO_DISPLAY.map(genreName => {
+      const movieGenres = await tmdbApi.getGenreList("movie");
+
+      const genreMap = new Map<string, number>();
+      if (Array.isArray(movieGenres)) {
+        movieGenres.forEach((genre) => genreMap.set(genre.name, genre.id));
+      }
+
+      // This block ensures we only fetch MOVIES for the genre-specific carousels.
+      const genrePromises = GENRE_CATEGORIES_TO_DISPLAY.map((genreName) => {
         const genreId = genreMap.get(genreName);
-        return genreId ? fetchMediaByGenreByPage('movie', genreId, 1) : Promise.resolve(null);
+        // The first argument 'movie' is key. It tells the API to only look for movies.
+        return genreId
+          ? tmdbApi.fetchMediaByGenreByPage("movie", genreId, 1)
+          : Promise.resolve(null);
       });
 
-      const allResults = await Promise.all([...initialPromises, ...genrePromises]);
+      const allResults = await Promise.all([
+        ...initialPromises,
+        ...genrePromises,
+      ]);
 
       const initialCategories: Category[] = [
-        { id: "trending", title: "Trending Now", items: allResults[0]?.results || [], mediaType: 'movie' },
-        { id: "popular-movies", title: "Popular Movies", items: allResults[1]?.results || [], mediaType: 'movie' },
-        { id: "tv-shows", title: "Top Rated TV Shows", items: allResults[2]?.results || [], mediaType: 'tv' },
-        { id: "new-releases", title: "Upcoming Movies", items: allResults[3]?.results || [], mediaType: 'movie' },
+        {
+          id: "trending",
+          title: "Trending Now",
+          items: allResults[0]?.results || [],
+          mediaType: "movie",
+        },
+        {
+          id: "popular-movies",
+          title: "Popular Movies",
+          items: allResults[1]?.results || [],
+          mediaType: "movie",
+        },
+        {
+          id: "tv-shows",
+          title: "Top Rated TV Shows",
+          items: allResults[2]?.results || [],
+          mediaType: "tv",
+        },
+        {
+          id: "new-releases",
+          title: "Upcoming Movies",
+          items: allResults[3]?.results || [],
+          mediaType: "movie",
+        },
       ];
 
-      const genreCategories: Category[] = GENRE_CATEGORIES_TO_DISPLAY.map((genreName, index) => {
-        const genreId = genreMap.get(genreName);
-        return {
-          id: `genre-${genreId}`,
-          title: genreName,
-          items: allResults[4 + index]?.results || [],
-          genreId: genreId,
-          mediaType: 'movie',
-        };
-      });
+      const genreCategories: Category[] = GENRE_CATEGORIES_TO_DISPLAY.map(
+        (genreName, index) => {
+          const genreId = genreMap.get(genreName);
+          const items = allResults[4 + index]?.results || [];
+          return {
+            id: `genre-${genreId}`,
+            title: genreName,
+            items: items,
+            genreId: genreId,
+            // We explicitly set the mediaType to 'movie' for these carousels.
+            mediaType: "movie" as const,
+          };
+        }
+      ).filter((cat) => cat.items.length > 0 && cat.genreId);
 
-      setAllCategories([...initialCategories, ...genreCategories.filter(cat => cat.items.length > 0)]);
+      setAllCategories([...initialCategories, ...genreCategories]);
       setIsLoading(false);
     };
 
     loadAllData();
   }, []);
 
+  const changeFeaturedItem = useCallback(() => {
+    if (heroBannerPool.length > 0) {
+      const currentFeaturedId = featuredItem?.id;
+      let newFeaturedItem = featuredItem;
+      if (heroBannerPool.length > 1) {
+        do {
+          newFeaturedItem =
+            heroBannerPool[Math.floor(Math.random() * heroBannerPool.length)];
+        } while (newFeaturedItem?.id === currentFeaturedId);
+      }
+      setFeaturedItem(newFeaturedItem);
+    }
+  }, [heroBannerPool, featuredItem]);
+
+  useEffect(() => {
+    if (allCategories.length > 0 && heroBannerPool.length === 0) {
+      const bannerPool: MediaItem[] =
+        allCategories.find((cat) => cat.id === "trending")?.items || [];
+      if (bannerPool.length > 0) {
+        setHeroBannerPool(bannerPool);
+        setFeaturedItem(bannerPool[0]);
+      }
+    }
+  }, [allCategories, heroBannerPool]);
+
   useEffect(() => {
     if (allCategories.length === 0) return;
-    const bannerPool: MediaItem[] = allCategories.find((cat) => cat.id === "trending")?.items || [];
-    if (bannerPool.length > 0) {
-      setHeroBannerPool(bannerPool);
-      setFeaturedItem(bannerPool[Math.floor(Math.random() * bannerPool.length)]);
-    }
-  }, [allCategories]);
-  
-  useEffect(() => {
     if (categoryParam === "movies") {
-      setFilteredCategories(allCategories.filter(cat => cat.mediaType === 'movie'));
+      setFilteredCategories(
+        allCategories.filter((cat) => cat.mediaType === "movie")
+      );
     } else if (categoryParam === "tv") {
-      setFilteredCategories(allCategories.filter(cat => cat.mediaType === 'tv'));
+      setFilteredCategories(
+        allCategories.filter((cat) => cat.mediaType === "tv")
+      );
     } else {
       setFilteredCategories(allCategories);
     }
   }, [categoryParam, allCategories]);
 
   useEffect(() => {
-    if (heroBannerPool.length === 0) return;
-    const intervalId = setInterval(() => {
-      const newFeaturedItem = heroBannerPool[Math.floor(Math.random() * heroBannerPool.length)];
-      setFeaturedItem(newFeaturedItem);
-    }, 12000);
+    if (heroBannerPool.length < 2) return;
+    const intervalId = setInterval(changeFeaturedItem, 12000);
     return () => clearInterval(intervalId);
-  }, [heroBannerPool]);
+  }, [heroBannerPool, changeFeaturedItem]);
 
   return (
     <main className="min-h-screen bg-black text-white">
       <Navbar />
       {isLoading ? (
         <div className="flex items-center justify-center min-h-screen">
-          <motion.div className="w-16 h-16 border-t-4 border-red-600 rounded-full" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} />
+          <motion.div
+            className="w-16 h-16 border-t-4 border-red-600 rounded-full"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          />
         </div>
       ) : (
         <>
@@ -130,7 +187,11 @@ export default function BrowsePage() {
                 <Carousel
                   title={category.title}
                   initialItems={category.items}
-                  categoryType={category.id.startsWith('genre-') ? 'genre' : category.id as CategoryType}
+                  categoryType={
+                    category.id.startsWith("genre-")
+                      ? "genre"
+                      : (category.id as CategoryType)
+                  }
                   genreId={category.genreId}
                   mediaType={category.mediaType}
                 />

@@ -5,14 +5,10 @@ import { MediaItem } from "../../data/mockData";
 import MovieCard from "./MovieCard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
-import {
-  fetchTrendingByPage,
-  fetchPopularMoviesByPage,
-  fetchTopRatedShowsByPage,
-  fetchUpcomingMoviesByPage,
-  fetchMediaByGenreByPage,
-  PaginatedResponse,
-} from "../../services/tmdb";
+
+// --- [FIX 1]: Import all services as a single object ---
+import * as tmdbApi from "../../services/tmdb";
+import { PaginatedResponse } from "../../services/tmdb"; // We can still import types individually
 
 export type CategoryType =
   | "trending"
@@ -42,25 +38,23 @@ export default function Carousel({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // --- THIS IS THE FIX ---
-  // We move fetchMoreData inside useCallback and update the dependency array.
   const loadMore = useCallback(async () => {
-    // Helper function is now defined inside the callback that uses it.
     const fetchMoreData = async (
       pageNum: number
     ): Promise<PaginatedResponse | null> => {
+      // --- [FIX 2]: Call the functions from the imported object ---
       switch (categoryType) {
         case "trending":
-          return fetchTrendingByPage(pageNum);
+          return tmdbApi.fetchTrendingByPage(pageNum);
         case "popular-movies":
-          return fetchPopularMoviesByPage(pageNum);
+          return tmdbApi.fetchPopularMoviesByPage(pageNum);
         case "tv-shows":
-          return fetchTopRatedShowsByPage(pageNum);
+          return tmdbApi.fetchTopRatedShowsByPage(pageNum);
         case "new-releases":
-          return fetchUpcomingMoviesByPage(pageNum);
+          return tmdbApi.fetchUpcomingMoviesByPage(pageNum);
         case "genre":
           if (genreId) {
-            return fetchMediaByGenreByPage(mediaType, genreId, pageNum);
+            return tmdbApi.fetchMediaByGenreByPage(mediaType, genreId, pageNum);
           }
           return null;
         default:
@@ -92,8 +86,6 @@ export default function Carousel({
       setHasMore(false);
     }
     setIsLoadingMore(false);
-    // The dependency array is now more accurate, including everything
-    // from the "outside" that the callback depends on.
   }, [isLoadingMore, hasMore, page, categoryType, genreId, mediaType]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -120,7 +112,7 @@ export default function Carousel({
       <div className="relative group">
         <button
           onClick={() => scroll("left")}
-          className="absolute left-2 top-1/2 -translate-y-1-2 z-10 bg-black/60 hover:bg-black/90 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center w-9 h-9 rounded-full"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/60 hover:bg-black/90 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center w-9 h-9 rounded-full"
         >
           <ChevronLeft size={20} />
         </button>
@@ -151,7 +143,7 @@ export default function Carousel({
 
         <button
           onClick={() => scroll("right")}
-          className="absolute right-2 top-1/2 -translate-y-1-2 z-10 bg-black/60 hover:bg-black/90 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center w-9 h-9 rounded-full"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/60 hover:bg-black/90 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center w-9 h-9 rounded-full"
         >
           <ChevronRight size={20} />
         </button>

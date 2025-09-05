@@ -5,7 +5,7 @@ import { prisma } from "../../../../lib/prisma";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, email, password, role } = body;
+    const { name, email, password } = body;
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -21,14 +21,12 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-
     const passwordRegex =
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
     if (!passwordRegex.test(password)) {
       return NextResponse.json(
         {
-          error:
-            "Password must be at least 8 characters, include uppercase, lowercase, number, and special character",
+          error: "Password must meet complexity requirements.",
         },
         { status: 400 }
       );
@@ -44,22 +42,26 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = (await prisma.user.create({
+    // Let the database handle the default role as defined in the schema
+    const user = await prisma.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
-        role: role || "USER",
       },
-    })) as { id: string; email: string };
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+    });
 
-    return NextResponse.json(
-      { id: user.id, email: user.email },
-      { status: 201 }
-    );
+    return NextResponse.json(user, { status: 201 });
   } catch (error) {
+    // Log the actual error on the server for debugging
+    console.error("Signup Route Error:", error);
     return NextResponse.json(
-      { error: "the user already exists" },
+      { error: "An unexpected error occurred during signup." },
       { status: 500 }
     );
   }

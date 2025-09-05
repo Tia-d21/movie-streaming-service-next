@@ -6,10 +6,13 @@ import {
   useEffect,
   useContext,
   ReactNode,
+  useCallback,
 } from "react";
+import { useRouter } from "next/navigation";
+import { fetchWithAuth } from "../../lib/apiHelper";
 
-// The UserProfile type remains the same for the session
 export type UserProfile = {
+  id: string;
   name: string;
   email: string;
   role: "USER" | "ADMIN";
@@ -18,87 +21,86 @@ export type UserProfile = {
 interface UserProfileContextType {
   user: UserProfile | null;
   isLoading: boolean;
-  login: (profile: UserProfile) => void;
+  token: string | null;
+  login: (token: string, userData: UserProfile) => void;
   logout: () => void;
+  // --- [NEW] Add a function to update the user's state ---
+  updateUserProfile: (updatedData: Partial<UserProfile>) => void;
 }
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(
   undefined
 );
 
-const getInitialProfile = (): UserProfile | null => {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  try {
-    const item = window.localStorage.getItem("userProfile");
-    return item ? JSON.parse(item) : null;
-  } catch (error) {
-    console.error("Error parsing userProfile from localStorage", error);
-    return null;
-  }
-};
-
 export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+
+  const logout = useCallback(() => {
+    setUser(null);
+    setToken(null);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("authToken");
+      window.localStorage.removeItem("userProfile");
+    }
+    router.push("/auth/login");
+  }, [router]);
 
   useEffect(() => {
-    setUser(getInitialProfile());
-    setIsLoading(false);
-  }, []);
-
-  const login = (profile: UserProfile) => {
-    try {
-      // This function's role is to manage the CURRENT session
-      window.localStorage.setItem("userProfile", JSON.stringify(profile));
-      setUser(profile);
-    } catch (error) {
-      console.error("Error saving userProfile to localStorage", error);
+    if (typeof window === "undefined") {
+      setIsLoading(false);
+      return;
     }
-  };
-
-  // --- THIS IS THE UPDATED LOGOUT LOGIC ---
-  const logout = () => {
-    try {
-      const currentUserEmail = user?.email;
-
-      // Clear the current session
-      window.localStorage.removeItem("userProfile");
-      setUser(null);
-
-      // --- IMPORTANT: As requested, this section removes the user's registration data. ---
-      // In a real-world app, a standard logout would NOT do this. This is more like "Delete Account".
-      if (currentUserEmail) {
-        const usersJSON = window.localStorage.getItem("registeredUsers");
-        const registeredUsers = usersJSON ? JSON.parse(usersJSON) : [];
-
-        // Filter out the user who is logging out
-        const updatedUsers = registeredUsers.filter(
-          (registeredUser: UserProfile) =>
-            registeredUser.email !== currentUserEmail
-        );
-
-        // Save the updated list back to localStorage
-        window.localStorage.setItem(
-          "registeredUsers",
-          JSON.stringify(updatedUsers)
-        );
-        console.log(
-          `User ${currentUserEmail} has been logged out and their registration data has been removed.`
-        );
+    const initializeAuth = async () => {
+      const storedToken = window.localStorage.getItem("authToken");
+      if (storedToken) {
+        try {
+          const profileData = await fetchWithAuth("/api/users/me");
+          if (profileData && profileData.id) {
+            setUser(profileData);
+            setToken(storedToken);
+            window.localStorage.setItem(
+              "userProfile",
+              JSON.stringify(profileData)
+            );
+          } else {
+            logout();
+          }
+        } catch (error) {
+          console.error("Session validation failed:", error);
+          logout();
+        }
       }
+      setIsLoading(false);
+    };
+    initializeAuth();
+  }, [logout]);
 
-      // Also clear other session-related data
-      window.localStorage.removeItem("myList");
-      window.localStorage.removeItem("favoritesList");
-    } catch (error) {
-      console.error("Error during logout process", error);
+  const login = (newToken: string, userData: UserProfile) => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("authToken", newToken);
+      window.localStorage.setItem("userProfile", JSON.stringify(userData));
     }
+    setToken(newToken);
+    setUser(userData);
   };
-  // --- END OF UPDATED LOGIC ---
 
-  const value = { user, isLoading, login, logout };
+  // --- [NEW] This function updates the user state and localStorage ---
+  const updateUserProfile = (updatedData: Partial<UserProfile>) => {
+    setUser((prevUser) => {
+      if (!prevUser) return null;
+      const newUser = { ...prevUser, ...updatedData };
+      // Also update localStorage so the change persists on refresh
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("userProfile", JSON.stringify(newUser));
+      }
+      return newUser;
+    });
+  };
+
+  const value = { user, isLoading, token, login, logout, updateUserProfile };
 
   return (
     <UserProfileContext.Provider value={value}>

@@ -1,86 +1,95 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { authMiddleware } from '@/middlewares/auth';
-import { prisma } from '@/lib/prisma';
+import { NextRequest, NextResponse } from "next/server";
+import { authMiddleware } from "middlewares/auth";
+import { prisma } from "lib/prisma";
+import { movieUpsert } from "lib/movieUpsert";
 
 export async function GET(req: NextRequest) {
   try {
     const user = await authMiddleware(req);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const skip = (page - 1) * limit;
-
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const history = await prisma.watchHistory.findMany({
       where: { userId: user.userId },
-      skip,
-      take: limit,
-      orderBy: { watchedAt: 'desc' },
+      orderBy: { watchedAt: "desc" },
       include: {
         movie: {
           select: {
             id: true,
             title: true,
+            year: true,
+            posterPath: true,
             url: true,
-            rating: true,
-            category: { select: { id: true, name: true } },
           },
         },
       },
     });
-
-    const total = await prisma.watchHistory.count({ where: { userId: user.userId } });
-
-    return NextResponse.json({
-      history,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    });
+    return NextResponse.json({ history });
   } catch (err) {
-    console.error('Error fetching watch history:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error("Error fetching watch history:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const user = await authMiddleware(req);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { movieId } = await req.json();
-    if (!movieId || typeof movieId !== 'number') {
-      return NextResponse.json({ error: 'Movie ID is required and must be a number' }, { status: 400 });
-    }
+    const movieData = await req.json();
+    const movie = await movieUpsert(movieData);
+    const movieId = movie.id;
 
-    const movie = await prisma.movie.findUnique({ where: { id: movieId } });
-    if (!movie) return NextResponse.json({ error: 'Movie not found' }, { status: 404 });
-
-    const existing = await prisma.watchHistory.findFirst({
-      where: { userId: user.userId, movieId },
+    // The TypeScript error here will now be resolved.
+    const historyEntry = await prisma.watchHistory.upsert({
+      where: {
+        userId_movieId: {
+          userId: user.userId,
+          movieId: movieId,
+        },
+      },
+      update: { watchedAt: new Date() },
+      create: { userId: user.userId, movieId: movieId, watchedAt: new Date() },
     });
 
-    if (existing) {
-      const updated = await prisma.watchHistory.update({
-        where: { id: existing.id },
-        data: { watchedAt: new Date() },
-        include: { movie: { select: { id: true, title: true, url: true, rating: true, category: { select: { id: true, name: true } } } } },
-      });
-      return NextResponse.json(updated);
-    }
-
-    const newEntry = await prisma.watchHistory.create({
-      data: { userId: user.userId, movieId, watchedAt: new Date() },
-      include: { movie: { select: { id: true, title: true, url: true, rating: true, category: { select: { id: true, name: true } } } } },
-    });
-
-    return NextResponse.json(newEntry, { status: 201 });
+    return NextResponse.json(historyEntry, { status: 201 });
   } catch (err) {
-    console.error('Error adding to watch history:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error("Error adding to watch history:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await authMiddleware(req);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const { movieId } = await req.json();
+    if (!movieId) {
+      return NextResponse.json(
+        { error: "movieId is required" },
+        { status: 400 }
+      );
+    }
+    await prisma.watchHistory.deleteMany({
+      where: {
+        userId: user.userId,
+        movieId: parseInt(movieId, 10),
+      },
+    });
+    return NextResponse.json({ message: "Removed from watch history" });
+  } catch (error) {
+    console.error("Error deleting watch history item:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

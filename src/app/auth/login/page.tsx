@@ -2,81 +2,60 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useUserProfile } from "../../../app/hooks/useUserProfile";
-// --- 1. IMPORT THE ICONS ---
 import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const [errors, setErrors] = useState({ email: "", password: "" });
-  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
-
-  // --- 2. ADD STATE FOR PASSWORD VISIBILITY ---
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const router = useRouter();
   const { login } = useUserProfile();
 
-  // Define User type for localStorage users
-  interface User {
-    name: string;
-    email: string;
-    password: string;
-  }
-
-  const validate = () => {
-    // ... validation logic remains the same
-    const newErrors = { email: "", password: "" };
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim()) {
-      newErrors.email = "Email address is required.";
-    } else if (!emailRegex.test(email)) {
-      newErrors.email = "Please enter a valid email address.";
-    }
-    if (!password) {
-      newErrors.password = "Password is required.";
-    }
-    return newErrors;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setShowSignupPrompt(false);
+    setIsLoading(true);
+    setError(null);
 
-    const validationErrors = validate();
-    setErrors(validationErrors);
-
-    if (Object.values(validationErrors).some((error) => error !== "")) {
+    // Basic client-side validation
+    if (!email || !password) {
+      setError("Email and password are required.");
+      setIsLoading(false);
       return;
     }
 
     try {
-      const usersJSON = localStorage.getItem("registeredUsers");
-      const users: User[] = usersJSON ? JSON.parse(usersJSON) : [];
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-      const foundUser = users.find(
-        (user: User) => user.email === email && user.password === password
-      );
+      const data = await response.json();
 
-      if (foundUser) {
-        // Note: This will cause the TypeScript error you saw before,
-        // because the UserProfile type now expects a `role` property.
-        // login({ name: foundUser.name, email: foundUser.email });
-
-        // A temporary fix is to manually add the role here for the local-only version:
-        login({ name: foundUser.name, email: foundUser.email, role: "USER" });
-
-        router.push("/main/browse");
-      } else {
-        setShowSignupPrompt(true);
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Login failed. Please check your credentials."
+        );
       }
-    } catch (error) {
-      console.error("Failed to log in:", error);
+
+      // On successful login, save token and user data via the context
+      login(data.token, data.user);
+      router.push("/main/browse");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unexpected error occurred.");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -102,47 +81,34 @@ export default function LoginPage() {
           >
             <h1 className="text-3xl font-bold mb-8">Sign In</h1>
 
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded-md text-center text-red-300">
+                {error}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div>
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (errors.email) {
-                      setErrors((prev) => ({ ...prev, email: "" }));
-                    }
-                  }}
-                  placeholder="Email or phone number"
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email address"
+                  autoComplete="email"
                   required
-                  className={`w-full p-4 rounded bg-gray-700 text-white border focus:outline-none focus:ring-2 transition-colors ${
-                    errors.email
-                      ? "border-red-500 ring-red-500"
-                      : "border-gray-600 focus:border-red-500 ring-transparent focus:ring-red-500"
-                  }`}
+                  className="w-full p-4 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 transition-colors focus:border-red-500 ring-transparent focus:ring-red-500"
                 />
-                {errors.email && (
-                  <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-                )}
               </div>
 
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (errors.password) {
-                      setErrors((prev) => ({ ...prev, password: "" }));
-                    }
-                  }}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password"
+                  autoComplete="current-password"
                   required
-                  className={`w-full p-4 pr-12 rounded bg-gray-700 text-white border focus:outline-none focus:ring-2 transition-colors ${
-                    errors.password
-                      ? "border-red-500 ring-red-500"
-                      : "border-gray-600 focus:border-red-500 ring-transparent focus:ring-red-500"
-                  }`}
+                  className="w-full p-4 pr-12 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 transition-colors focus:border-red-500 ring-transparent focus:ring-red-500"
                 />
                 <button
                   type="button"
@@ -153,15 +119,13 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-              {errors.password && (
-                <p className="text-red-500 text-sm mt-1">{errors.password}</p>
-              )}
 
               <button
                 type="submit"
-                className="cursor-pointer w-full py-3 rounded bg-red-600 text-white font-medium hover:bg-red-700 transition duration-200"
+                disabled={isLoading}
+                className="cursor-pointer w-full py-3 rounded bg-red-600 text-white font-medium hover:bg-red-700 transition duration-200 disabled:bg-red-900 disabled:cursor-not-allowed"
               >
-                Sign In
+                {isLoading ? "Signing In..." : "Sign In"}
               </button>
               <div className="flex items-center justify-between text-zinc-400 text-sm">
                 <label className="flex items-center cursor-pointer">
@@ -179,26 +143,6 @@ export default function LoginPage() {
               </div>
             </form>
 
-            <AnimatePresence>
-              {showSignupPrompt && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="mt-6 text-center bg-red-900/50 border border-red-500 p-4 rounded-md"
-                >
-                  <p className="text-red-300 mb-4">
-                    Incorrect email or password. Please sign up first.
-                  </p>
-                  <Link href="/auth/signup">
-                    <button className="py-2 px-6 rounded bg-white text-black font-medium hover:bg-gray-200 transition duration-200">
-                      Sign Up Now
-                    </button>
-                  </Link>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
             <div className="mt-12 text-zinc-400">
               <p>
                 New to NetStream?{" "}
@@ -208,14 +152,6 @@ export default function LoginPage() {
                 >
                   Sign up now
                 </Link>
-                .
-              </p>
-              <p className="mt-4 text-xs">
-                This page is protected by Google reCAPTCHA to ensure
-                you`&apos;`re not a bot.{" "}
-                <a href="#" className="text-blue-500 hover:underline ml-1">
-                  Learn more
-                </a>
                 .
               </p>
             </div>

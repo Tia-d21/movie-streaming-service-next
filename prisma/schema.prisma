@@ -16,15 +16,16 @@ model User {
   createdAt DateTime @default(now())
 
   // Relations
-  favorites      Favorite[]
-  mylist         MyList[]
-  ratings        Rating[]
-  feedbacks      Feedback[]
-  watchHistories WatchHistory[]
+  favorites    Favorite[]
+  mylist       MyList[]
+  ratings      Rating[]
+  feedbacks    Feedback[]
+  watchHistory WatchHistory[] // Corrected pluralization from watchHistories
 }
 
 model Movie {
-  id          Int       @id @default(autoincrement())
+  // --- CHANGE 1: Use the TMDB ID as the primary key. It's already unique. ---
+  id          Int      @id
   title       String
   description String
   genre       String
@@ -33,15 +34,18 @@ model Movie {
   releaseDate DateTime?
   url         String
   rating      Float?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
+
+  // --- CHANGE 2: Add the missing posterPath field. ---
+  posterPath  String? // This will store the image URL.
 
   // Relations
-  category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  favorites      Favorite[]
-  mylist         MyList[]
-  ratings        Rating[]
-  feedbacks      Feedback[]
-  watchHistories WatchHistory[]
+  category     Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  favorites    Favorite[]
+  mylist       MyList[]
+  ratings      Rating[]
+  feedbacks    Feedback[]
+  watchHistory WatchHistory[] // Corrected pluralization from watchHistories
 }
 
 model Category {
@@ -58,6 +62,8 @@ model WatchHistory {
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
 }
 
 model Favorite {
@@ -66,8 +72,8 @@ model Favorite {
   movieId   Int
   createdAt DateTime @default(now())
 
-  user  User  @relation(fields: [userId], references: [id])
-  movie Movie @relation(fields: [movieId], references: [id])
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade) // Added onDelete
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade) // Added onDelete
 
   @@unique([userId, movieId])
 }
@@ -79,8 +85,8 @@ model MyList {
   status    MyListStatus @default(TOWATCH)
   createdAt DateTime     @default(now())
 
-  user  User  @relation(fields: [userId], references: [id])
-  movie Movie @relation(fields: [movieId], references: [id])
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade) // Added onDelete
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade) // Added onDelete
 
   @@unique([userId, movieId])
 }
@@ -95,11 +101,11 @@ model Rating {
   id        String   @id @default(uuid())
   userId    String
   movieId   Int
-  value     Int // 1–5 stars
+  value     Int
   createdAt DateTime @default(now())
 
-  user  User  @relation(fields: [userId], references: [id])
-  movie Movie @relation(fields: [movieId], references: [id])
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade) // Added onDelete
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade) // Added onDelete
 
   @@unique([userId, movieId])
 }
@@ -111,8 +117,8 @@ model Feedback {
   message   String
   createdAt DateTime @default(now())
 
-  user  User   @relation(fields: [userId], references: [id])
-  movie Movie? @relation(fields: [movieId], references: [id])
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade) // Added onDelete
+  movie Movie? @relation(fields: [movieId], references: [id], onDelete: Cascade) // Added onDelete
 }
 
 enum Role {

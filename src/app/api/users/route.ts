@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'; 
-import bcrypt from 'bcryptjs';
-import { prisma } from '@/lib/prisma';
-import { adminAuth } from '@/middlewares/adminAuth';
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { prisma } from "lib/prisma";
+import { adminAuth } from "middlewares/adminAuth";
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,13 +19,16 @@ export async function GET(req: NextRequest) {
         ratings: { select: { movieId: true, value: true } },
         feedbacks: { select: { id: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json(users);
-  } catch (error: any) {
-    console.error('Error fetching users:', error);
-    return NextResponse.json({ error: error.message || 'Unauthorized' }, { status: 401 });
+  } catch (error: unknown) {
+    console.error("Error fetching users:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unauthorized" },
+      { status: 401 }
+    );
   }
 }
 
@@ -35,12 +38,15 @@ export async function POST(req: NextRequest) {
     const { name, email, password, role } = body;
 
     if (!name || !email || !password) {
-      return NextResponse.json({ error: 'Name, email, and password are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Name, email, and password are required" },
+        { status: 400 }
+      );
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const validRoles = ['USER', 'ADMIN'];
-    const userRole = validRoles.includes(role) ? role : 'USER';
+    const validRoles = ["USER", "ADMIN"];
+    const userRole = validRoles.includes(role) ? role : "USER";
 
     const user = await prisma.user.create({
       data: {
@@ -51,15 +57,36 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating user:', error);
-    if (error.code === 'P2002') return NextResponse.json({ error: 'Email already exists' }, { status: 409 });
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+      { status: 201 }
+    );
+  } catch (error: unknown) {
+    console.error("Error creating user:", error);
+    interface PrismaError {
+      code?: string;
+      [key: string]: unknown;
+    }
+    const prismaError = error as PrismaError;
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      prismaError.code === "P2002"
+    ) {
+      return NextResponse.json(
+        { error: "Email already exists" },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
