@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "middlewares/adminAuth";
 import { prisma } from "lib/prisma";
 import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 // GET movie by id
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -17,7 +18,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const movie = await prisma.movie.findUnique({
       where: { id: movieId },
       include: {
-        category: { select: { id: true, name: true } },
         favorites: { include: { user: { select: { id: true, name: true } } } },
         mylist: { include: { user: { select: { id: true, name: true } } } },
         ratings: { include: { user: { select: { id: true, name: true } } } },
@@ -53,7 +53,7 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const { categoryId, title, description, genre, year, url, rating } = body;
+    const { title, description, genre, year, url, rating } = body;
 
     const dataToUpdate: Prisma.MovieUpdateInput = {};
 
@@ -64,32 +64,10 @@ export async function PUT(
     if (url) dataToUpdate.url = url;
     if (rating !== undefined) dataToUpdate.rating = rating;
 
-    if (categoryId) {
-      if (typeof categoryId !== "string") {
-        return NextResponse.json(
-          { error: "categoryId must be a string" },
-          { status: 400 }
-        );
-      }
-      const category = await prisma.category.findUnique({
-        where: { id: categoryId },
-      });
-      if (!category) {
-        return NextResponse.json(
-          { error: "Invalid category ID" },
-          { status: 400 }
-        );
-      }
-      dataToUpdate.category = {
-        connect: { id: categoryId },
-      };
-    }
-
     const updatedMovie = await prisma.movie.update({
       where: { id: movieId },
       data: dataToUpdate,
       include: {
-        category: { select: { id: true, name: true } },
         favorites: { include: { user: { select: { id: true, name: true } } } },
         mylist: { include: { user: { select: { id: true, name: true } } } },
         ratings: { include: { user: { select: { id: true, name: true } } } },
@@ -100,11 +78,12 @@ export async function PUT(
     return NextResponse.json(updatedMovie);
   } catch (error: unknown) {
     console.error("Error updating movie:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error instanceof PrismaClientKnownRequestError) {
       if (error.code === "P2025") {
         return NextResponse.json({ error: "Movie not found" }, { status: 404 });
       }
     }
+
     if (error instanceof Error && error.message.includes("Unauthorized")) {
       return NextResponse.json({ error: error.message }, { status: 401 });
     }
@@ -134,7 +113,7 @@ export async function DELETE(
     return new NextResponse(null, { status: 204 });
   } catch (error: unknown) {
     console.error("Error deleting movie:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error instanceof PrismaClientKnownRequestError) {
       if (error.code === "P2025") {
         return NextResponse.json({ error: "Movie not found" }, { status: 404 });
       }
