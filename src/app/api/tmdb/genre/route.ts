@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchTMDB } from "@/lib/tmdb";
+import { fetchTMDB } from "lib/tmdb";
 
 // Map frontend-friendly genre names to TMDB IDs
 const GENRE_MAP: Record<string, number> = {
