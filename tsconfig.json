@@ -13,6 +13,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
+    "forceConsistentCasingInFileNames": true, // ✅ Add this line
     "plugins": [
       {
         "name": "next"
@@ -24,7 +25,9 @@
       "@/lib/*": ["./src/lib/*"],
       "@/middlewares/*": ["./src/middlewares/*"],
       "@/utils/*": ["./src/utils/*"],
-      "@/components/*": ["./src/app/components/*"]
+      "@/components/*": ["./src/app/components/*"],
+      "@/hooks/*": ["./src/app/hooks/*"],
+      "@/services/*": ["./src/app/services/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/**/*"],

@@ -11,28 +11,29 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   const response = await fetch(url, { ...options, headers });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: "An API error occurred" }));
-    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    let errorMessage = `HTTP error! status: ${response.status}`;
+    
+    try {
+      const errorData = await response.json();
+      // Handle different error response formats
+      if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      } else if (errorData.error) {
+        errorMessage = errorData.error;
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      }
+    } catch {
+      // If response is not JSON, use default error message
+    }
+    
+    throw new Error(errorMessage);
   }
 
   const contentType = response.headers.get("content-type");
-  if (contentType && contentType.includes("application/json")) return response.json();
+  if (contentType && contentType.includes("application/json")) {
+    return response.json();
+  }
 
   return;
-};
-
-export interface ChangePasswordPayload {
-  userId: string;
-  currentPassword: string;
-  newPassword: string;
-}
-
-export const changePassword = async (payload: ChangePasswordPayload) => {
-  return fetchWithAuth(`/api/users/${payload.userId}/password-change`, {
-    method: "PUT",
-    body: JSON.stringify({
-      currentPassword: payload.currentPassword,
-      newPassword: payload.newPassword,
-    }),
-  });
 };
