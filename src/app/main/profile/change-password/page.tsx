@@ -7,7 +7,7 @@ import { ArrowLeft, KeyRound, Eye, EyeOff } from "lucide-react";
 import Navbar from "../../../../app/components/layout/Navbar";
 import Footer from "../../../../app/components/layout/Footer";
 import { useUserProfile } from "../../../../app/hooks/useUserProfile";
-import { changePassword } from "../../../../lib/apiHelper";
+import { fetchWithAuth } from "../../../../lib/apiHelper";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -68,12 +68,10 @@ export default function ChangePasswordPage() {
 
     try {
       if (!user?.id) throw new Error("User not found");
-
-      await changePassword({
-        userId: user.id,
-        currentPassword,
-        newPassword,
-      });
+ await fetchWithAuth(`/api/users/${user.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
 
       setSuccessMessage("Your password has been changed successfully!");
       setTimeout(() => router.push("/main/profile"), 2500);
@@ -123,17 +121,19 @@ export default function ChangePasswordPage() {
               </label>
               <div className="relative">
                 <input
-                  id="currentPassword"
-                  type={showCurrent ? "text" : "password"}
-                  autoComplete="current-password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className={`w-full p-3 rounded bg-gray-800 text-white border focus:outline-none focus:ring-2 ${
-                    errors.currentPassword ? "border-red-500 ring-red-500" : "border-gray-700 focus:ring-red-500"
-                  }`}
-                  aria-invalid={errors.currentPassword ? "true" : "false"}
-                  required
-                />
+  id="currentPassword"
+  type={showCurrent ? "text" : "password"}
+  autoComplete="current-password"
+  value={currentPassword}
+  onChange={(e) => setCurrentPassword(e.target.value)}
+  className={`w-full p-3 rounded bg-gray-800 text-white border focus:outline-none focus:ring-2 ${
+    errors.currentPassword ? "border-red-500 ring-red-500" : "border-gray-700 focus:ring-red-500"
+  }`}
+  aria-invalid={Boolean(errors.currentPassword)}
+  
+  required
+/>
+
                 <button
                   type="button"
                   onClick={() => setShowCurrent(!showCurrent)}
@@ -160,7 +160,7 @@ export default function ChangePasswordPage() {
                   className={`w-full p-3 rounded bg-gray-800 text-white border focus:outline-none focus:ring-2 ${
                     errors.newPassword ? "border-red-500 ring-red-500" : "border-gray-700 focus:ring-red-500"
                   }`}
-                  aria-invalid={errors.newPassword ? "true" : "false"}
+                aria-invalid={Boolean(errors.newPassword)} 
                   required
                 />
                 <button
@@ -189,7 +189,7 @@ export default function ChangePasswordPage() {
                   className={`w-full p-3 rounded bg-gray-800 text-white border focus:outline-none focus:ring-2 ${
                     errors.confirmPassword ? "border-red-500 ring-red-500" : "border-gray-700 focus:ring-red-500"
                   }`}
-                  aria-invalid={errors.confirmPassword ? "true" : "false"}
+                  aria-invalid={Boolean(errors.confirmPassword)}
                   required
                 />
                 <button

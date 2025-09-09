@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authMiddleware } from "middlewares/auth";
-import { prisma } from "lib/prisma";
+import { authMiddleware } from "@/middlewares/auth";
+import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-
 import { Role, Prisma } from "@prisma/client";
 
 export async function GET(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
-) {  
+) {
   try {
-    const user = await authMiddleware(req);
+    const user = await authMiddleware(request);
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -48,20 +47,31 @@ export async function GET(
 }
 
 export async function PUT(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
-) {     try {
-    const user = await authMiddleware(req);
+) {
+  try {
+    const user = await authMiddleware(request);
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // Only admin or the user themselves can update (admin can update everything)
+    // Only admin or the user themselves can update
     if (user.role !== "ADMIN" && user.userId !== params.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const body = await req.json();
-    const { name, email, password, role } = body;
+    const body = await request.json();
+    const { name, email, role, currentPassword, newPassword, password } = body;
+
+    // Handle password change (requires current password for users, not for admins)
+    if (currentPassword && newPassword) {
+      return handlePasswordChange(params.id, currentPassword, newPassword, user);
+    }
+
+    // Handle admin password reset (no current password required)
+    if (password && user.role === "ADMIN") {
+      return handleAdminPasswordReset(params.id, password);
+    }
 
     const dataToUpdate: Prisma.UserUpdateInput = {};
 
@@ -78,18 +88,6 @@ export async function PUT(
         );
       }
       dataToUpdate.email = email;
-    }
-
-    // Update password with hashing
-    if (password) {
-      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#]).{8,}$/;
-      if (!passwordRegex.test(password)) {
-        return NextResponse.json(
-          { error: "Password does not meet complexity requirements" },
-          { status: 400 }
-        );
-      }
-      dataToUpdate.password = await bcrypt.hash(password, 10);
     }
 
     // Update role only if the current user is admin
@@ -133,12 +131,12 @@ export async function PUT(
   }
 }
 
-
 export async function DELETE(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
-) {     try {
-    const user = await authMiddleware(req);
+) {
+  try {
+    const user = await authMiddleware(request);
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -167,5 +165,96 @@ export async function DELETE(
       }
     }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+// Helper function for password change (requires current password)
+async function handlePasswordChange(
+  userId: string, 
+  currentPassword: string, 
+  newPassword: string,
+  authUser: { role: string; userId: string } // ✅ Replace 'any' with proper type
+) {
+  try {
+    // Users can only change their own password
+    if (authUser.role !== "ADMIN" && authUser.userId !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (!currentPassword || !newPassword) {
+      return NextResponse.json(
+        { error: "Both current and new passwords are required." }, 
+        { status: 400 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, password: true },
+    });
+
+    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return NextResponse.json(
+        { error: "Current password is incorrect" }, 
+        { status: 400 }
+      );
+    }
+
+    // Validate new password complexity
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#]).{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return NextResponse.json(
+        { error: "Password must be at least 8 characters with uppercase, lowercase, number, and special character" },
+        { status: 400 }
+      );
+    }
+
+    // Hash new password and update
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({ 
+      where: { id: user.id }, 
+      data: { password: hashedPassword } 
+    });
+
+    return NextResponse.json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error("Error changing password:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// Helper function for admin password reset (no current password required)
+async function handleAdminPasswordReset(userId: string, newPassword: string) {
+  try {
+    // Validate password complexity
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#]).{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return NextResponse.json(
+        { error: "Password must be at least 8 characters with uppercase, lowercase, number, and special character" },
+        { status: 400 }
+      );
+    }
+
+    // Hash new password and update
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({ 
+      where: { id: userId }, 
+      data: { password: hashedPassword } 
+    });
+
+    return NextResponse.json({ message: "Password reset successfully" });
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
