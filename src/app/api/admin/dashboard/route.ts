@@ -1,16 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth } from '@/middlewares/adminAuth';
+import { authMiddleware } from '@/middlewares/auth';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(req: NextRequest) {
   try {
-    await adminAuth(req); // Ensure only admin can access
+    const user = await authMiddleware(req);
+    
+    // Check if user is admin
+    if (!user || user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 401 }
+      );
+    }
 
-    const totalUsers = await prisma.user.count();
-    const totalFavorites = await prisma.favorite.count();
-    const totalMyList = await prisma.myList.count();
-    const totalRatings = await prisma.rating.count();
-    const totalFeedbacks = await prisma.feedback.count();
+    const [
+      totalUsers,
+      totalFavorites,
+      totalMyList,
+      totalRatings,
+      totalFeedbacks
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.favorite.count(),
+      prisma.myList.count(),
+      prisma.rating.count(),
+      prisma.feedback.count()
+    ]);
 
     return NextResponse.json({
       totalUsers,
@@ -21,6 +37,17 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: unknown) {
     console.error('Error fetching admin dashboard:', error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unauthorized' }, { status: 401 });
+    
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

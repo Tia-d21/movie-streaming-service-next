@@ -5,16 +5,17 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { UserPlus, ShieldAlert, Trash, Edit, X } from "lucide-react";
 
-import Navbar from "../components/layout/Navbar";
-import Footer from "../components/layout/Footer";
-import { useUserProfile } from "../hooks/useUserProfile";
+import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import {
   getAllUsers,
   addUser,
   updateUser,
   deleteUser,
   User,
-} from "../services/adminApi";
+  UpdateUser,
+} from "@/services/adminApi";
 
 export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -39,18 +40,24 @@ export default function AdminPage() {
   }, [user, isUserLoading, router]);
 
   // --- Fetch users ---
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const fetchedUsers = await getAllUsers();
+      setUsers(fetchedUsers);
+      setError(null);
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const fetchedUsers = await getAllUsers();
-        setUsers(fetchedUsers);
-      } catch (err) {
-        setError((err as Error).message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    if (user?.role === "ADMIN") fetchUsers();
+    if (user?.role === "ADMIN") {
+      fetchUsers();
+    }
   }, [user]);
 
   // --- Role change ---
@@ -64,8 +71,9 @@ export default function AdminPage() {
         prev.map((u) => (u.id === updatedUser.id ? updatedUser : u))
       );
     } catch (err) {
-      console.error(err);
-      alert("Failed to update role");
+      const error = err as Error;
+      console.error(error);
+      alert(error.message || "Failed to update role");
     }
   };
 
@@ -79,8 +87,9 @@ export default function AdminPage() {
       await deleteUser(userId);
       setUsers((prev) => prev.filter((u) => u.id !== userId));
     } catch (err) {
-      console.error(err);
-      alert("Failed to delete user");
+      const error = err as Error;
+      console.error(error);
+      alert(error.message || "Failed to delete user");
     }
   };
 
@@ -99,9 +108,11 @@ export default function AdminPage() {
     try {
       const newUser = await addUser({ name, email, password, role });
       setUsers((prev) => [...prev, newUser]);
+      alert("User added successfully!");
     } catch (err) {
-      console.error(err);
-      alert("Failed to add user");
+      const error = err as Error;
+      console.error(error);
+      alert(error.message || "Failed to add user");
     }
   };
 
@@ -120,14 +131,44 @@ export default function AdminPage() {
     if (!user) return alert("Missing auth token");
 
     try {
-      const updatedUser = await updateUser(editModalUser.id, formData);
+      // Prepare update data
+      const updateData: UpdateUser = {
+        name: formData.name,
+        email: formData.email,
+        role: formData.role
+      };
+
+      // Only include password if provided (admin can reset passwords)
+      if (formData.password.trim()) {
+        updateData.password = formData.password;
+      }
+
+      console.log("Sending update data:", updateData);
+      
+      const updatedUser = await updateUser(editModalUser.id, updateData);
+      
       setUsers((prev) =>
         prev.map((u) => (u.id === updatedUser.id ? updatedUser : u))
       );
+      
       setEditModalUser(null);
+      setFormData({ name: "", email: "", password: "", role: "USER" });
+      alert("User updated successfully!");
+      
     } catch (err) {
-      console.error(err);
-      alert("Failed to save changes");
+      const error = err as Error;
+      console.error("Update error:", error);
+      
+      // Show specific error messages
+      if (error.message.includes("Email already in use")) {
+        alert("This email is already registered");
+      } else if (error.message.includes("Invalid email format")) {
+        alert("Please enter a valid email address");
+      } else if (error.message.includes("Password does not meet")) {
+        alert("Password must be at least 8 characters with uppercase, lowercase, number, and special character");
+      } else {
+        alert(error.message || "Failed to save changes. Please check the console.");
+      }
     }
   };
 
@@ -173,9 +214,9 @@ export default function AdminPage() {
         </div>
 
         {error && (
-          <p className="text-red-500 bg-red-900/50 p-3 rounded-md mb-4">
+          <div className="text-red-500 bg-red-900/50 p-3 rounded-md mb-4">
             {error}
-          </p>
+          </div>
         )}
 
         <div className="bg-gray-900 rounded-lg overflow-x-auto">
@@ -190,6 +231,9 @@ export default function AdminPage() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Role
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  Created
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Actions
@@ -208,23 +252,29 @@ export default function AdminPage() {
                         handleRoleChange(u.id, e.target.value as "USER" | "ADMIN")
                       }
                       className="bg-gray-700 text-white px-2 py-1 rounded-md"
-                      disabled={u.id === user.id}
+                      disabled={u.id === user?.id}
+                      aria-label={`Change role for ${u.name}`}
                     >
                       <option value="USER">USER</option>
                       <option value="ADMIN">ADMIN</option>
                     </select>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                    {new Date(u.createdAt).toLocaleDateString()}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap flex gap-2">
                     <button
                       onClick={() => handleEditClick(u)}
                       className="flex items-center gap-1 text-yellow-400 hover:text-yellow-300 px-2 py-1 rounded-md"
+                      aria-label={`Edit ${u.name}`}
                     >
                       <Edit size={16} /> Edit
                     </button>
                     <button
                       onClick={() => handleDelete(u.id)}
                       className="flex items-center gap-1 text-red-500 hover:text-red-400 px-2 py-1 rounded-md"
-                      disabled={u.id === user.id}
+                      disabled={u.id === user?.id}
+                      aria-label={`Delete ${u.name}`}
                     >
                       <Trash size={16} /> Delete
                     </button>
@@ -241,55 +291,75 @@ export default function AdminPage() {
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 rounded-md p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Edit User</h2>
-              <button onClick={() => setEditModalUser(null)} aria-label="Close modal">
+              <h2 className="text-xl font-bold">Edit User: {editModalUser.name}</h2>
+              <button 
+                onClick={() => setEditModalUser(null)} 
+                aria-label="Close modal"
+                className="p-1 hover:bg-gray-700 rounded"
+              >
                 <X size={20} />
               </button>
             </div>
 
-            <input
-              type="text"
-              placeholder="Name"
-              value={formData.name}
-              onChange={(e) => handleEditChange("name", e.target.value)}
-              className="px-3 py-2 rounded-md bg-gray-700 text-white w-full mb-3"
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={(e) => handleEditChange("email", e.target.value)}
-              className="px-3 py-2 rounded-md bg-gray-700 text-white w-full mb-3"
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={formData.password}
-              onChange={(e) => handleEditChange("password", e.target.value)}
-              className="px-3 py-2 rounded-md bg-gray-700 text-white w-full mb-3"
-            />
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="edit-name" className="block text-sm text-gray-300 mb-1">Name</label>
+                <input
+                  id="edit-name"
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => handleEditChange("name", e.target.value)}
+                  className="px-3 py-2 rounded-md bg-gray-700 text-white w-full"
+                  placeholder="Enter name"
+                />
+              </div>
 
-            <label htmlFor="edit-role" className="text-gray-300 mr-2">
-              Role
-            </label>
-            <select
-              id="edit-role"
-              value={formData.role}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  role: e.target.value as "USER" | "ADMIN",
-                }))
-              }
-              className="bg-gray-700 text-white px-2 py-1 rounded-md w-full mb-4"
-            >
-              <option value="USER">USER</option>
-              <option value="ADMIN">ADMIN</option>
-            </select>
+              <div>
+                <label htmlFor="edit-email" className="block text-sm text-gray-300 mb-1">Email</label>
+                <input
+                  id="edit-email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleEditChange("email", e.target.value)}
+                  className="px-3 py-2 rounded-md bg-gray-700 text-white w-full"
+                  placeholder="Enter email"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="edit-password" className="block text-sm text-gray-300 mb-1">
+                  New Password (leave empty to keep current)
+                </label>
+                <input
+                  id="edit-password"
+                  type="password"
+                  placeholder="Enter new password"
+                  value={formData.password}
+                  onChange={(e) => handleEditChange("password", e.target.value)}
+                  className="px-3 py-2 rounded-md bg-gray-700 text-white w-full"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Password must contain uppercase, lowercase, number, and special character
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="edit-role" className="block text-sm text-gray-300 mb-1">Role</label>
+                <select
+                  id="edit-role"
+                  value={formData.role}
+                  onChange={(e) => handleEditChange("role", e.target.value)}
+                  className="bg-gray-700 text-white px-3 py-2 rounded-md w-full"
+                >
+                  <option value="USER">USER</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
+              </div>
+            </div>
 
             <button
               onClick={handleEditSave}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md w-full"
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md w-full mt-4"
             >
               Save Changes
             </button>

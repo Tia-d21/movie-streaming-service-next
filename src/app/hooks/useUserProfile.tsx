@@ -9,7 +9,7 @@ import {
   useCallback,
 } from "react";
 import { useRouter } from "next/navigation";
-import { fetchWithAuth } from "../../lib/apiHelper";
+import { fetchWithAuth } from "@/lib/apiHelper";
 
 export type UserProfile = {
   id: string;
@@ -18,15 +18,15 @@ export type UserProfile = {
   role: "USER" | "ADMIN";
 };
 
-
 interface UserProfileContextType {
   user: UserProfile | null;
   isLoading: boolean;
   token: string | null;
   login: (token: string, userData: UserProfile) => void;
   logout: () => void;
-  // --- [NEW] Add a function to update the user's state ---
   updateUserProfile: (updatedData: Partial<UserProfile>) => void;
+  updateProfile: (data: { name?: string; email?: string }) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(
@@ -85,12 +85,10 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
     setUser(userData);
   };
   
-  // --- [NEW] This function updates the user state and localStorage ---
   const updateUserProfile = (updatedData: Partial<UserProfile>) => {
     setUser(prevUser => {
       if (!prevUser) return null;
       const newUser = { ...prevUser, ...updatedData };
-      // Also update localStorage so the change persists on refresh
       if (typeof window !== "undefined") {
         window.localStorage.setItem("userProfile", JSON.stringify(newUser));
       }
@@ -98,7 +96,36 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const value = { user, isLoading, token, login, logout, updateUserProfile };
+  const updateProfile = async (data: { name?: string; email?: string }) => {
+    if (!user) throw new Error("User not authenticated");
+    
+    const response = await fetchWithAuth(`/api/users/${user.id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+    
+    updateUserProfile(response);
+  };
+
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    if (!user) throw new Error("User not authenticated");
+    
+    await fetchWithAuth(`/api/users/${user.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+  };
+
+  const value = { 
+    user, 
+    isLoading, 
+    token, 
+    login, 
+    logout, 
+    updateUserProfile,
+    updateProfile,
+    changePassword
+  };
 
   return (
     <UserProfileContext.Provider value={value}>
